@@ -1,40 +1,59 @@
 import bcrypt from "bcryptjs";
 import { generateToken } from "../utils/generateToken.js";
 import { OAuth2Client } from "google-auth-library";
+import { sendEmail } from "../utils/sendEmail.js";
+import { generateOTP } from "../utils/generateOTP.js";
+
 
 
 
 // Dummy user storage (Day 1 only)
-let users = [];
+let users = [
+//   {
+//   id,
+//   email,
+//   password,
+//   role,
+//   isVerified: false,
+//   otp: "123456",
+//   otpExpiry: Date
+// }
+
+];
 
 // REGISTER
 export const registerUser = async (req, res) => {
   try {
-    const {name, email, password, role } = req.body;
+    const { name, email, password, role } = req.body;
 
-    if (!name||!email || !password) {
+    // validation
+    if (!name || !email || !password) {
       return res.status(400).json({ message: "All fields required" });
     }
 
-    //email format validation 
-     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-     if (!emailRegex.test(email)) {
-       return res.status(400).json({ message: "Invalid email format" });
-     }
+    // email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
 
-     //check dublicate email
-     const existingUser = users.find(
+    // duplicate check
+    const existingUser = users.find(
       (u) => u.email.toLowerCase() === email.toLowerCase()
     );
 
     if (existingUser) {
       return res.status(400).json({ message: "Email already registered" });
     }
+    // password optional (store if given)
+    let hashedPassword = null;
+    if (password) {
+      hashedPassword = await bcrypt.hash(password, 10);
+    }
 
-
-    // hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    
+    // generate OTP
+    const otp = generateOTP();
 
     const user = {
       id: Date.now(),
@@ -42,18 +61,74 @@ export const registerUser = async (req, res) => {
       email,
       password: hashedPassword,
       role: role || "buyer",
+
+      // OTP fields
+      isVerified: false,
+      otp,
+      otpExpiry: Date.now() + 5 * 60 * 1000, // 5 min
+      otpAttempts: 0,
     };
 
     users.push(user);
 
+    // send OTP email
+    await sendEmail(email, otp);
+
     res.status(201).json({
-      message: "User registered successfully",
-      token: generateToken(user),
+      message: "OTP sent to email. Please verify before login.",
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
+
+/**
+ * =========================
+ * VERIFY OTP
+ * =========================
+ */
+export const verifyOTP = (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    const user = users.find((u) => u.email === email);
+
+    if (!user) {
+      return res.status(400).json({ message: "User not found" });
+    }
+
+    // check attempts (security)
+    if (user.otpAttempts >= 5) {
+      return res.status(429).json({
+        message: "Too many attempts. Try again later.",
+      });
+    }
+
+    // check expiry
+    if (Date.now() > user.otpExpiry) {
+      return res.status(400).json({ message: "OTP expired" });
+    }
+
+    // wrong OTP
+    if (user.otp !== otp) {
+      user.otpAttempts += 1;
+      return res.status(400).json({ message: "Invalid OTP" });
+    }
+
+    // success
+    user.isVerified = true;
+    user.otp = null;
+    user.otpExpiry = null;
+    user.otpAttempts = 0;
+
+    res.json({
+      message: "Email verified successfully",
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 
 // LOGIN
 export const loginUser = async (req, res) => {
