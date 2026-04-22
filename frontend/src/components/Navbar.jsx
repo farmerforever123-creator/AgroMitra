@@ -1,20 +1,59 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import {
-  Search,
-  ShoppingCart,
-  User,
-  Menu,
-  X,
-  Wheat,
-  ChevronDown,
-  ShoppingBag,
-} from 'lucide-react'
+import { ChevronDown, ShoppingCart, Search, Menu, X } from 'lucide-react'
+import { supabase } from '../lib/supabase'
 
 export default function Navbar() {
-  const [mobileOpen, setMobileOpen] = useState(false)
   const [loginOpen, setLoginOpen] = useState(false)
-  const [search, setSearch] = useState('')
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const [cartCount, setCartCount] = useState(0)
+  const dropdownRef = useRef(null)
+
+  useEffect(() => {
+    fetchCartCount()
+
+    function handleCartUpdated() {
+      fetchCartCount()
+    }
+
+    function handleClickOutside(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setLoginOpen(false)
+      }
+    }
+
+    window.addEventListener('cartUpdated', handleCartUpdated)
+    document.addEventListener('mousedown', handleClickOutside)
+
+    return () => {
+      window.removeEventListener('cartUpdated', handleCartUpdated)
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
+
+  async function fetchCartCount() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      setCartCount(0)
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('cart_items')
+      .select('quantity')
+      .eq('buyer_id', user.id)
+
+    if (error) {
+      setCartCount(0)
+      return
+    }
+
+    const total = (data || []).reduce((sum, item) => sum + item.quantity, 0)
+    setCartCount(total)
+  }
 
   const navLinkClass = ({ isActive }) =>
     `px-4 py-2 rounded-full font-semibold transition-all duration-300 ${
@@ -26,76 +65,70 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-50 px-3 sm:px-4 pt-3">
       <div className="max-w-7xl mx-auto">
-        <div className="backdrop-blur-xl bg-white/85 border border-white/70 shadow-[0_12px_40px_rgba(0,0,0,0.08)] rounded-2xl px-4 sm:px-6 py-3">
+        <div className="backdrop-blur-xl bg-white/85 border border-white/70 shadow rounded-3xl px-4 sm:px-6 py-3">
           <div className="flex items-center justify-between gap-4">
             <Link to="/" className="flex items-center gap-3 shrink-0">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-100 via-green-50 to-green-100 flex items-center justify-center shadow-inner">
-                <Wheat className="text-green-700" size={26} />
+              <div className="w-12 h-12 rounded-2xl bg-green-50 flex items-center justify-center shadow-sm">
+                <span className="text-2xl">🌾</span>
               </div>
               <div>
-                <h1 className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-green-700 to-emerald-500 bg-clip-text text-transparent">
+                <h1 className="text-2xl font-bold text-green-700 leading-none">
                   AgroMitra
                 </h1>
-                <p className="text-[11px] text-slate-400 font-medium -mt-1">
-                  Buyer & Seller Marketplace
+                <p className="text-xs text-slate-500 mt-1">
+                  Buyer &amp; Seller Marketplace
                 </p>
               </div>
             </Link>
 
-            <div className="hidden lg:flex flex-1 max-w-xl mx-4">
+            <div className="hidden md:flex flex-1 max-w-xl mx-4">
               <div className="w-full relative">
                 <Search
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
                   size={18}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
                 />
                 <input
                   type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search products, seeds, fertilizers..."
-                  className="w-full h-14 rounded-full border border-slate-200/80 bg-white/70 pl-12 pr-5 text-slate-700 outline-none focus:ring-4 focus:ring-green-100 focus:border-green-400 shadow-inner"
+                  className="w-full h-14 rounded-full border border-slate-200 bg-white/90 pl-12 pr-4 outline-none focus:border-green-500 transition"
                 />
               </div>
             </div>
 
             <nav className="hidden lg:flex items-center gap-2 relative">
               <NavLink to="/products" className={navLinkClass}>
-                <span className="inline-flex items-center gap-2">
-                  <ShoppingBag size={18} />
-                  Products
-                </span>
+                Products
               </NavLink>
 
               <NavLink to="/contact" className={navLinkClass}>
                 Contact
               </NavLink>
 
-              <div className="relative">
+              <div className="relative" ref={dropdownRef}>
                 <button
                   onClick={() => setLoginOpen((prev) => !prev)}
-                  className="px-4 py-2 rounded-full font-semibold text-slate-600 hover:text-green-700 hover:bg-white/80 transition-all duration-300 inline-flex items-center gap-2"
+                  className="px-4 py-2 rounded-full font-semibold text-slate-600 hover:text-green-700 hover:bg-white/80 transition inline-flex items-center gap-2"
                 >
-                  <User size={18} />
                   Login
                   <ChevronDown size={16} />
                 </button>
 
                 {loginOpen && (
-                  <div className="absolute top-14 right-0 w-56 rounded-2xl border border-slate-100 bg-white/95 backdrop-blur-xl shadow-[0_12px_40px_rgba(0,0,0,0.08)] p-2">
+                  <div className="absolute top-14 right-0 w-56 rounded-2xl border border-slate-100 bg-white shadow-lg p-2">
                     <Link
                       to="/buyer-login"
                       onClick={() => setLoginOpen(false)}
-                      className="block px-4 py-3 rounded-xl text-slate-700 hover:bg-green-50 hover:text-green-700 font-medium"
+                      className="block px-4 py-3 rounded-xl text-slate-700 hover:bg-green-50 hover:text-green-700"
                     >
-                      Buyer
+                      Buyer Login
                     </Link>
 
                     <Link
                       to="/seller-login"
                       onClick={() => setLoginOpen(false)}
-                      className="block px-4 py-3 rounded-xl text-slate-700 hover:bg-green-50 hover:text-green-700 font-medium"
+                      className="block px-4 py-3 rounded-xl text-slate-700 hover:bg-green-50 hover:text-green-700"
                     >
-                      Seller
+                      Seller Login
                     </Link>
                   </div>
                 )}
@@ -105,79 +138,91 @@ export default function Navbar() {
                 Register
               </NavLink>
 
-              <button className="relative ml-2 w-12 h-12 rounded-full bg-gradient-to-br from-green-600 to-emerald-500 text-white flex items-center justify-center shadow-lg shadow-green-200 hover:scale-105 transition">
-                <ShoppingCart size={20} />
-                <span className="absolute -top-1 -right-1 min-w-[22px] h-[22px] px-1 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center border-2 border-white">
-                  0
+              <Link
+                to="/cart"
+                className="relative ml-2 w-14 h-14 rounded-full bg-green-600 text-white flex items-center justify-center shadow hover:bg-green-700 transition"
+              >
+                <ShoppingCart size={22} />
+                <span className="absolute -top-1 -right-1 min-w-[24px] h-6 px-2 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center">
+                  {cartCount}
                 </span>
-              </button>
+              </Link>
             </nav>
 
             <button
               onClick={() => setMobileOpen((prev) => !prev)}
-              className="lg:hidden w-11 h-11 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center"
+              className="lg:hidden w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center"
             >
               {mobileOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
           </div>
 
-          <div className="lg:hidden mt-4">
-            <div className="relative">
-              <Search
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                size={18}
-              />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search products..."
-                className="w-full h-12 rounded-full border border-slate-200 bg-white pl-12 pr-4 outline-none focus:ring-4 focus:ring-green-100"
-              />
-            </div>
-          </div>
-
           {mobileOpen && (
-            <div className="lg:hidden mt-4 border-t border-slate-100 pt-4 grid grid-cols-1 gap-3">
-              <Link
-                to="/products"
-                onClick={() => setMobileOpen(false)}
-                className="rounded-2xl bg-slate-50 hover:bg-green-50 px-4 py-3 text-slate-700 font-semibold"
-              >
-                Products
-              </Link>
+            <div className="lg:hidden mt-4 border-t pt-4">
+              <div className="mb-4 relative">
+                <Search
+                  size={18}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  type="text"
+                  placeholder="Search products..."
+                  className="w-full h-12 rounded-full border border-slate-200 bg-white pl-12 pr-4 outline-none focus:border-green-500"
+                />
+              </div>
 
-              <Link
-                to="/buyer-login"
-                onClick={() => setMobileOpen(false)}
-                className="rounded-2xl bg-slate-50 hover:bg-green-50 px-4 py-3 text-slate-700 font-semibold"
-              >
-                Buyer Login
-              </Link>
+              <div className="flex flex-col gap-2">
+                <NavLink
+                  to="/products"
+                  className={navLinkClass}
+                  onClick={() => setMobileOpen(false)}
+                >
+                  Products
+                </NavLink>
 
-              <Link
-                to="/seller-login"
-                onClick={() => setMobileOpen(false)}
-                className="rounded-2xl bg-slate-50 hover:bg-green-50 px-4 py-3 text-slate-700 font-semibold"
-              >
-                Seller Login
-              </Link>
+                <NavLink
+                  to="/contact"
+                  className={navLinkClass}
+                  onClick={() => setMobileOpen(false)}
+                >
+                  Contact
+                </NavLink>
 
-              <Link
-                to="/register"
-                onClick={() => setMobileOpen(false)}
-                className="rounded-2xl bg-slate-50 hover:bg-green-50 px-4 py-3 text-slate-700 font-semibold"
-              >
-                Register
-              </Link>
+                <Link
+                  to="/buyer-login"
+                  className="px-4 py-2 rounded-full font-semibold text-slate-600 hover:text-green-700 hover:bg-white/80"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  Buyer Login
+                </Link>
 
-              <Link
-                to="/contact"
-                onClick={() => setMobileOpen(false)}
-                className="rounded-2xl bg-slate-50 hover:bg-green-50 px-4 py-3 text-slate-700 font-semibold"
-              >
-                Contact
-              </Link>
+                <Link
+                  to="/seller-login"
+                  className="px-4 py-2 rounded-full font-semibold text-slate-600 hover:text-green-700 hover:bg-white/80"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  Seller Login
+                </Link>
+
+                <NavLink
+                  to="/register"
+                  className={navLinkClass}
+                  onClick={() => setMobileOpen(false)}
+                >
+                  Register
+                </NavLink>
+
+                <Link
+                  to="/cart"
+                  className="px-4 py-2 rounded-full font-semibold bg-green-600 text-white flex items-center justify-between"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <span>Cart</span>
+                  <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-2 rounded-full bg-red-500 text-white text-xs font-bold">
+                    {cartCount}
+                  </span>
+                </Link>
+              </div>
             </div>
           )}
         </div>
