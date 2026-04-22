@@ -10,13 +10,23 @@ export const addProduct = async (req, res) => {
         message: "All fields required",
       });
     }
+   const priceNum = parseFloat(price);
+
+if (!name || isNaN(priceNum) || priceNum <= 0) {
+  return res.status(400).json({
+    message: "Invalid price",
+  });
+}
+
+
+
 
     const product = {
       id: Date.now(),
       name,
       price,
       image: req.file ? req.file.filename : null,
-      sellerId: req.user.id,
+      farmerId: req.user.id,
     };
 
     products.push(product);
