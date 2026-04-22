@@ -1,131 +1,142 @@
 import React, { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Mail, Lock, Eye, EyeOff, ShoppingCart } from 'lucide-react'
+import { useNavigate, Link } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
 
 export default function BuyerLogin() {
-  const [showPassword, setShowPassword] = useState(false)
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    remember: false,
-  })
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const navigate = useNavigate()
 
-  function handleChange(e) {
-    const { name, value, type, checked } = e.target
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }))
-  }
-
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
-    console.log('Buyer login:', formData)
+    setLoading(true)
+    setError('')
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (error) {
+      setError(error.message)
+      setLoading(false)
+      return
+    }
+
+    const userId = data.user.id
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .single()
+
+    if (profileError) {
+      setError(profileError.message)
+      setLoading(false)
+      return
+    }
+
+    if (profile.role !== 'buyer') {
+      setError('This account is not a buyer account.')
+      await supabase.auth.signOut()
+      setLoading(false)
+      return
+    }
+
+    setLoading(false)
+    navigate('/products')
   }
 
   return (
-    <section className="min-h-[calc(100vh-80px)] bg-gradient-to-br from-green-50 via-white to-emerald-50 flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-5xl grid lg:grid-cols-2 bg-white rounded-3xl shadow-[0_20px_80px_rgba(0,0,0,0.08)] overflow-hidden border border-green-100">
-        <div className="hidden lg:flex flex-col justify-center bg-gradient-to-br from-green-700 via-green-600 to-emerald-500 p-10 text-white">
-          <div className="w-16 h-16 rounded-2xl bg-white/15 flex items-center justify-center mb-6">
-            <ShoppingCart size={30} />
-          </div>
-          <h2 className="text-4xl font-bold mb-4">Buyer Login</h2>
-          <p className="text-green-50/90 text-lg leading-8">
-            Login as a buyer to explore products, compare prices, and place your orders easily.
-          </p>
-        </div>
-
-        <div className="flex items-center justify-center px-6 sm:px-10 py-10 sm:py-14">
-          <div className="w-full max-w-md">
-            <div className="mb-8">
-              <span className="inline-block px-4 py-1.5 rounded-full bg-green-100 text-green-700 text-sm font-semibold mb-4">
-                Buyer Access
-              </span>
-              <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-3">
-                Welcome Buyer
-              </h1>
-              <p className="text-slate-500 text-base">
-                Sign in to continue shopping on AgroMitra.
-              </p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Email address
-                </label>
-                <div className="relative">
-                  <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    placeholder="buyer@example.com"
-                    className="w-full h-14 rounded-2xl border border-slate-200 bg-slate-50 pl-12 pr-4 outline-none focus:border-green-500 focus:bg-white focus:ring-4 focus:ring-green-100 transition"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Password
-                </label>
-                <div className="relative">
-                  <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    name="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    placeholder="Enter your password"
-                    className="w-full h-14 rounded-2xl border border-slate-200 bg-slate-50 pl-12 pr-14 outline-none focus:border-green-500 focus:bg-white focus:ring-4 focus:ring-green-100 transition"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500"
-                  >
-                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between gap-4 text-sm">
-                <label className="flex items-center gap-2 text-slate-600 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    name="remember"
-                    checked={formData.remember}
-                    onChange={handleChange}
-                    className="w-4 h-4 accent-green-600 rounded"
-                  />
-                  Remember me
-                </label>
-
-                <a href="#" className="font-semibold text-green-600 hover:text-green-700">
-                  Forgot password?
-                </a>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full h-14 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-semibold text-lg shadow-lg shadow-green-200 transition-all"
-              >
-                Buyer Sign in
-              </button>
-            </form>
-
-            <p className="mt-6 text-center text-slate-500">
-              Don&apos;t have an account?{' '}
-              <Link to="/register" className="font-semibold text-green-600 hover:text-green-700">
-                Register here
-              </Link>
+    <section className="min-h-screen bg-slate-50 px-4 py-10">
+      <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-8 items-stretch">
+        <div className="hidden lg:flex rounded-3xl overflow-hidden relative min-h-[620px] shadow-xl">
+          <img
+            src="https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=1400&q=80"
+            alt="Buyer login"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-green-900/80 via-green-800/55 to-black/55" />
+          <div className="relative z-10 p-10 flex flex-col justify-end text-white">
+            <span className="inline-flex w-fit px-4 py-2 rounded-full bg-white/15 border border-white/20 text-sm font-medium mb-5">
+              Buyer Access
+            </span>
+            <h1 className="text-5xl font-bold leading-tight mb-4">
+              Buy smarter with AgroMitra
+            </h1>
+            <p className="text-lg text-green-50/90 leading-8 max-w-xl">
+              Browse trusted products, manage your cart, and purchase seeds,
+              fertilizers, tools, and fresh farm items with a clean buying flow.
             </p>
           </div>
+        </div>
+
+        <div className="bg-white rounded-3xl shadow-xl border border-slate-100 p-6 sm:p-8 lg:p-10 flex flex-col justify-center">
+          <div className="mb-8">
+            <div className="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center text-2xl shadow-sm mb-5">
+              🛒
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold text-slate-900">
+              Buyer Login
+            </h2>
+            <p className="text-slate-500 mt-3">
+              Login to explore products and manage your cart.
+            </p>
+          </div>
+
+          {error ? (
+            <div className="mb-5 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-red-600 text-sm">
+              {error}
+            </div>
+          ) : null}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Email Address
+              </label>
+              <input
+                type="email"
+                placeholder="buyer@example.com"
+                className="w-full h-14 rounded-2xl border border-slate-200 px-4 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100 transition"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Password
+              </label>
+              <input
+                type="password"
+                placeholder="Enter password"
+                className="w-full h-14 rounded-2xl border border-slate-200 px-4 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100 transition"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full h-14 rounded-2xl bg-green-600 text-white font-semibold text-lg hover:bg-green-700 transition shadow-sm"
+            >
+              {loading ? 'Logging in...' : 'Login as Buyer'}
+            </button>
+          </form>
+
+          <p className="text-sm text-slate-500 mt-6 text-center">
+            Need a new account?{' '}
+            <Link to="/register" className="text-green-700 font-semibold hover:underline">
+              Register here
+            </Link>
+          </p>
         </div>
       </div>
     </section>

@@ -1,55 +1,91 @@
-import React from 'react'
-import { ShoppingCart } from 'lucide-react'
+import React, { useState } from 'react'
+import { supabase } from '../lib/supabase'
 
-export default function ProductCard({
-  image,
-  name,
-  price,
-  category,
-  unit,
-  stock,
-}) {
+export default function ProductCard({ product }) {
+  const [adding, setAdding] = useState(false)
+
+  const productImage =
+    product?.product_images?.[0]?.image_url ||
+    product?.image_url ||
+    'https://picsum.photos/300/300'
+
+  async function handleAddToCart() {
+    setAdding(true)
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      alert('Please login as buyer first.')
+      setAdding(false)
+      return
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile || profile.role !== 'buyer') {
+      alert('Only buyer can add products to cart.')
+      setAdding(false)
+      return
+    }
+
+    const { data: existingItem } = await supabase
+      .from('cart_items')
+      .select('id, quantity')
+      .eq('buyer_id', user.id)
+      .eq('product_id', product.id)
+      .maybeSingle()
+
+    if (existingItem) {
+      await supabase
+        .from('cart_items')
+        .update({ quantity: existingItem.quantity + 1 })
+        .eq('id', existingItem.id)
+    } else {
+      await supabase
+        .from('cart_items')
+        .insert({
+          buyer_id: user.id,
+          product_id: product.id,
+          quantity: 1,
+        })
+    }
+
+    window.dispatchEvent(new Event('cartUpdated'))
+    alert('Product added to cart')
+    setAdding(false)
+  }
+
   return (
-    <div className="group relative overflow-hidden rounded-[28px] border border-white/60 bg-white/80 backdrop-blur-xl shadow-[0_14px_50px_rgba(0,0,0,0.08)] hover:shadow-[0_20px_70px_rgba(16,185,129,0.18)] transition-all duration-500">
-      <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-green-50/40 pointer-events-none" />
+    <div className="bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-lg transition">
+      <img
+        src={productImage}
+        alt={product?.name}
+        className="w-full h-56 object-cover"
+      />
 
-      <div className="relative h-56 overflow-hidden">
-        <img
-          src={image}
-          alt={name}
-          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-        />
+      <div className="p-4">
+        <h2 className="text-xl font-semibold mb-2">{product?.name}</h2>
 
-        {category && (
-          <div className="absolute left-4 top-4 px-3 py-1.5 rounded-full bg-white/85 backdrop-blur-md text-green-700 text-xs font-bold shadow-sm">
-            {category}
-          </div>
-        )}
+        <p className="text-green-600 font-bold text-lg">
+          ₹{product?.price}
+        </p>
 
-        <div className="absolute right-4 top-4 px-3 py-1.5 rounded-full bg-slate-900/75 backdrop-blur-md text-white text-xs font-semibold">
-          {stock > 0 ? 'In Stock' : 'Out of Stock'}
-        </div>
-      </div>
+        <p className="text-sm text-gray-500 mt-1">
+          Stock: {product?.stock_quantity ?? 0}
+        </p>
 
-      <div className="relative p-5">
-        <h3 className="text-lg font-bold text-slate-900 mb-2 min-h-[56px] line-clamp-2">
-          {name}
-        </h3>
-
-        <div className="flex items-center justify-between mb-5">
-          <p className="text-2xl font-extrabold bg-gradient-to-r from-green-700 to-emerald-500 bg-clip-text text-transparent">
-            ₹{price}
-            {unit ? <span className="text-sm text-slate-400 font-semibold"> / {unit}</span> : null}
-          </p>
-
-          <span className="text-sm font-medium text-slate-500">
-            Stock: {stock}
-          </span>
-        </div>
-
-        <button className="w-full h-12 rounded-2xl bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-green-200 transition-all duration-300">
-          <ShoppingCart size={18} />
-          Add to Cart
+        <button
+          onClick={handleAddToCart}
+          disabled={adding}
+          className="mt-4 w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700"
+        >
+          {adding ? 'Adding...' : 'Add to Cart'}
         </button>
       </div>
     </div>

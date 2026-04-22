@@ -1,34 +1,75 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { supabase } from '../lib/supabase'
 import ProductCard from '../components/ProductCard'
-import { PRODUCTS, CATEGORIES } from '../data/productsData'
 
 export default function Products() {
+  const [products, setProducts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All')
   const [sortBy, setSortBy] = useState('default')
 
+  useEffect(() => {
+    fetchProducts()
+  }, [])
+
+  async function fetchProducts() {
+    setLoading(true)
+    setError('')
+
+    const { data, error } = await supabase
+      .from('products')
+      .select(`
+        *,
+        categories(name),
+        product_images(image_url, is_primary, sort_order)
+      `)
+      .eq('is_active', true)
+      .eq('is_approved', true)
+
+    if (error) {
+      console.error(error)
+      setError(error.message)
+      setLoading(false)
+      return
+    }
+
+    setProducts(data || [])
+    setLoading(false)
+  }
+
+  const categories = useMemo(() => {
+    const names = products
+      .map((p) => p.categories?.name)
+      .filter(Boolean)
+
+    return ['All', ...new Set(names)]
+  }, [products])
+
   const filteredProducts = useMemo(() => {
-    let data = [...PRODUCTS]
+    let data = [...products]
 
     if (category !== 'All') {
-      data = data.filter((item) => item.category === category)
+      data = data.filter((item) => item.categories?.name === category)
     }
 
     if (search.trim()) {
-      const query = search.toLowerCase()
+      const q = search.toLowerCase()
       data = data.filter(
         (item) =>
-          item.name.toLowerCase().includes(query) ||
-          item.category.toLowerCase().includes(query)
+          item.name?.toLowerCase().includes(q) ||
+          item.description?.toLowerCase().includes(q) ||
+          item.categories?.name?.toLowerCase().includes(q)
       )
     }
 
     switch (sortBy) {
       case 'priceLowToHigh':
-        data.sort((a, b) => a.price - b.price)
+        data.sort((a, b) => Number(a.price) - Number(b.price))
         break
       case 'priceHighToLow':
-        data.sort((a, b) => b.price - a.price)
+        data.sort((a, b) => Number(b.price) - Number(a.price))
         break
       case 'nameAZ':
         data.sort((a, b) => a.name.localeCompare(b.name))
@@ -38,39 +79,37 @@ export default function Products() {
     }
 
     return data
-  }, [search, category, sortBy])
+  }, [products, category, search, sortBy])
+
+  if (loading) {
+    return <div className="p-8 text-lg">Loading products...</div>
+  }
+
+  if (error) {
+    return <div className="p-8 text-red-600">Error: {error}</div>
+  }
 
   return (
-    <section className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-green-50 px-4 py-10 sm:py-14">
+    <section className="min-h-screen bg-slate-50 px-4 py-8">
       <div className="max-w-7xl mx-auto">
-        <div className="rounded-[32px] bg-gradient-to-r from-slate-900 via-green-900 to-emerald-700 p-8 sm:p-10 text-white shadow-[0_20px_80px_rgba(0,0,0,0.12)] mb-8">
-          <p className="inline-block px-4 py-1.5 rounded-full bg-white/10 text-sm font-semibold mb-4">
-            AgroMitra Products
-          </p>
-          <h1 className="text-4xl sm:text-5xl font-bold mb-4">
-            Explore 200+ premium farm products
-          </h1>
-          <p className="text-white/85 text-lg max-w-3xl">
-            Seeds, fertilizers, tools, pesticides, irrigation, fruits and vegetables — all in one place.
-          </p>
-        </div>
+        <h1 className="text-3xl font-bold mb-6">Products</h1>
 
-        <div className="bg-white/80 backdrop-blur-xl border border-white/60 rounded-[28px] p-5 sm:p-6 shadow-[0_16px_60px_rgba(0,0,0,0.07)] mb-8">
-          <div className="grid lg:grid-cols-3 gap-4">
+        <div className="bg-white rounded-2xl shadow-sm border p-4 mb-8">
+          <div className="grid md:grid-cols-3 gap-4">
             <input
               type="text"
+              placeholder="Search products..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by product or category..."
-              className="w-full h-14 rounded-2xl border border-slate-200 bg-white px-4 outline-none focus:ring-4 focus:ring-green-100 focus:border-green-400"
+              className="w-full h-12 rounded-xl border border-slate-200 px-4 outline-none focus:border-green-500"
             />
 
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full h-14 rounded-2xl border border-slate-200 bg-white px-4 outline-none focus:ring-4 focus:ring-green-100 focus:border-green-400"
+              className="w-full h-12 rounded-xl border border-slate-200 px-4 outline-none focus:border-green-500"
             >
-              {CATEGORIES.map((item) => (
+              {categories.map((item) => (
                 <option key={item} value={item}>
                   {item}
                 </option>
@@ -80,7 +119,7 @@ export default function Products() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="w-full h-14 rounded-2xl border border-slate-200 bg-white px-4 outline-none focus:ring-4 focus:ring-green-100 focus:border-green-400"
+              className="w-full h-12 rounded-xl border border-slate-200 px-4 outline-none focus:border-green-500"
             >
               <option value="default">Sort By</option>
               <option value="priceLowToHigh">Price: Low to High</option>
@@ -89,24 +128,20 @@ export default function Products() {
             </select>
           </div>
 
-          <div className="mt-5 text-sm text-slate-500">
+          <div className="mt-4 text-sm text-slate-500">
             Showing <span className="font-semibold text-green-700">{filteredProducts.length}</span> products
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-8">
-          {filteredProducts.map((product) => (
-            <ProductCard
-              key={product.id}
-              image={product.image}
-              name={product.name}
-              price={product.price}
-              category={product.category}
-              unit={product.unit}
-              stock={product.stock}
-            />
-          ))}
-        </div>
+        {filteredProducts.length === 0 ? (
+          <p>No products found.</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+            {filteredProducts.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   )
