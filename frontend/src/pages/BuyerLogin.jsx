@@ -1,142 +1,160 @@
-import React, { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { Link } from 'react-router-dom'
+import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import '../components/landing.css'
 
 export default function BuyerLogin() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const navigate = useNavigate()
+  const [error, setError] = useState('')
 
-  async function handleSubmit(e) {
-    e.preventDefault()
+  async function handleSubmit(event) {
+    event.preventDefault()
     setLoading(true)
     setError('')
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    try {
+      const { data, error: loginError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-    if (error) {
-      setError(error.message)
+      if (loginError) {
+        setError(loginError.message)
+        setLoading(false)
+        return
+      }
+
+      const userId = data.user.id
+
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single()
+
+      if (profileError) {
+        setError(profileError.message)
+        setLoading(false)
+        return
+      }
+
+      if (profile.role !== 'buyer') {
+        setError('This account is not registered as a buyer.')
+        await supabase.auth.signOut()
+        setLoading(false)
+        return
+      }
+
+      window.location.href = '/products'
+    } catch {
+      setError('Something went wrong. Please try again.')
       setLoading(false)
-      return
     }
-
-    const userId = data.user.id
-
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', userId)
-      .single()
-
-    if (profileError) {
-      setError(profileError.message)
-      setLoading(false)
-      return
-    }
-
-    if (profile.role !== 'buyer') {
-      setError('This account is not a buyer account.')
-      await supabase.auth.signOut()
-      setLoading(false)
-      return
-    }
-
-    setLoading(false)
-    navigate('/products')
   }
 
   return (
-    <section className="min-h-screen bg-slate-50 px-4 py-10">
-      <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-8 items-stretch">
-        <div className="hidden lg:flex rounded-3xl overflow-hidden relative min-h-[620px] shadow-xl">
+    <section className="buyer-login-page">
+      <div className="buyer-login-layout">
+        <div className="buyer-login-visual">
           <img
-            src="https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=1400&q=80"
+            src="https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=1600&q=80"
             alt="Buyer login"
-            className="absolute inset-0 w-full h-full object-cover"
+            className="buyer-login-image"
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-green-900/80 via-green-800/55 to-black/55" />
-          <div className="relative z-10 p-10 flex flex-col justify-end text-white">
-            <span className="inline-flex w-fit px-4 py-2 rounded-full bg-white/15 border border-white/20 text-sm font-medium mb-5">
-              Buyer Access
-            </span>
-            <h1 className="text-5xl font-bold leading-tight mb-4">
-              Buy smarter with AgroMitra
-            </h1>
-            <p className="text-lg text-green-50/90 leading-8 max-w-xl">
-              Browse trusted products, manage your cart, and purchase seeds,
-              fertilizers, tools, and fresh farm items with a clean buying flow.
+          <div className="buyer-login-overlay" />
+
+          <div className="buyer-login-visual-content">
+            <span className="buyer-login-badge">Buyer Portal</span>
+            <h1>Shop smarter with AgroMitra</h1>
+            <p>
+              Access premium agricultural products, manage your cart, and buy
+              seeds, fertilizers, tools, vegetables, and fruits from one modern
+              marketplace.
             </p>
+
+            <div className="buyer-login-highlights">
+              <div className="highlight-card">
+                <h3>Trusted Products</h3>
+                <p>Buy with confidence from a cleaner and better marketplace.</p>
+              </div>
+
+              <div className="highlight-card">
+                <h3>Fast Shopping</h3>
+                <p>Explore products, compare options, and order quickly.</p>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-3xl shadow-xl border border-slate-100 p-6 sm:p-8 lg:p-10 flex flex-col justify-center">
-          <div className="mb-8">
-            <div className="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center text-2xl shadow-sm mb-5">
-              🛒
+        <div className="buyer-login-form-side">
+          <div className="buyer-login-card">
+            <div className="buyer-login-top">
+              <div className="buyer-login-icon">🛒</div>
+              <span className="buyer-login-small-badge">Welcome Back</span>
+              <h2>Buyer Login</h2>
+              <p>Login to continue shopping and manage your AgroMitra cart.</p>
             </div>
-            <h2 className="text-3xl sm:text-4xl font-bold text-slate-900">
-              Buyer Login
-            </h2>
-            <p className="text-slate-500 mt-3">
-              Login to explore products and manage your cart.
-            </p>
+
+            {error ? <div className="buyer-login-error">{error}</div> : null}
+
+            <form onSubmit={handleSubmit} className="buyer-login-form">
+              <div className="buyer-form-group">
+                <label>Email Address</label>
+                <input
+                  type="email"
+                  placeholder="buyer@example.com"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="buyer-form-group">
+                <label>Password</label>
+                <div className="password-field">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                  >
+                    {showPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="buyer-login-row">
+                <label className="remember-box">
+                  <input type="checkbox" />
+                  <span>Remember me</span>
+                </label>
+
+                <Link to="/register" className="buyer-login-link">
+                  Create account
+                </Link>
+              </div>
+
+              <button type="submit" className="buyer-login-btn" disabled={loading}>
+                {loading ? 'Logging in...' : 'Login as Buyer'}
+              </button>
+            </form>
+
+            <div className="buyer-login-bottom">
+              <p>
+                Want to sell products instead?{' '}
+                <Link to="/seller-login">Seller Login</Link>
+              </p>
+            </div>
           </div>
-
-          {error ? (
-            <div className="mb-5 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-red-600 text-sm">
-              {error}
-            </div>
-          ) : null}
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Email Address
-              </label>
-              <input
-                type="email"
-                placeholder="buyer@example.com"
-                className="w-full h-14 rounded-2xl border border-slate-200 px-4 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100 transition"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Password
-              </label>
-              <input
-                type="password"
-                placeholder="Enter password"
-                className="w-full h-14 rounded-2xl border border-slate-200 px-4 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100 transition"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full h-14 rounded-2xl bg-green-600 text-white font-semibold text-lg hover:bg-green-700 transition shadow-sm"
-            >
-              {loading ? 'Logging in...' : 'Login as Buyer'}
-            </button>
-          </form>
-
-          <p className="text-sm text-slate-500 mt-6 text-center">
-            Need a new account?{' '}
-            <Link to="/register" className="text-green-700 font-semibold hover:underline">
-              Register here
-            </Link>
-          </p>
         </div>
       </div>
     </section>

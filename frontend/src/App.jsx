@@ -1,22 +1,22 @@
 import React from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import Navbar from './components/Navbar'
-import Footer from './components/Footer'
-import Home from './pages/Home'
-import Products from './pages/Products'
-import Contact from './pages/Contact'
-import Register from './pages/Register'
-import BuyerLogin from './pages/BuyerLogin'
-import SellerLogin from './pages/SellerLogin'
-import Cart from './pages/Cart'
+import Navbar from './components/Navbar.jsx'
+import Footer from './components/Footer.jsx'
+import Home from './pages/Home.jsx'
+import Products from './pages/Products.jsx'
+import Contact from './pages/Contact.jsx'
+import Register from './pages/Register.jsx'
+import BuyerLogin from './pages/BuyerLogin.jsx'
+import SellerLogin from './pages/SellerLogin.jsx'
+import Cart from './pages/Cart.jsx'
 
 function App() {
   return (
     <Router>
-      <div className="min-h-screen flex flex-col bg-slate-50">
+      <div className="app-shell">
         <Navbar />
 
-        <main className="flex-grow">
+        <main>
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/products" element={<Products />} />

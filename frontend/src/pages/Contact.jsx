@@ -1,5 +1,12 @@
 import React, { useState } from 'react'
-import { Mail, Phone, MapPin, Send, Clock3, MessageSquareText } from 'lucide-react'
+import {
+  Mail,
+  Phone,
+  MapPin,
+  Send,
+  Clock3,
+  MessageSquareText,
+} from 'lucide-react'
 
 export default function Contact() {
   const [formData, setFormData] = useState({
@@ -9,17 +16,18 @@ export default function Contact() {
     message: '',
   })
 
-  function handleChange(e) {
-    const { name, value } = e.target
+  function handleChange(event) {
+    const { name, value } = event.target
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }))
   }
 
-  function handleSubmit(e) {
-    e.preventDefault()
+  function handleSubmit(event) {
+    event.preventDefault()
     console.log('Contact form:', formData)
+    alert('Message submitted successfully.')
   }
 
   return (
@@ -33,8 +41,8 @@ export default function Contact() {
             Get in touch
           </h1>
           <p className="text-lg text-slate-500 leading-8">
-            Have questions about our products, support, or agricultural services?
-            Our team is here to help you quickly and professionally.
+            Have questions about our products, support, or agricultural
+            services? Our team is here to help you quickly and professionally.
           </p>
         </div>
 

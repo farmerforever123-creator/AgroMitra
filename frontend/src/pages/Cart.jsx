@@ -70,11 +70,7 @@ export default function Cart() {
   }
 
   async function removeItem(cartItemId) {
-    await supabase
-      .from('cart_items')
-      .delete()
-      .eq('id', cartItemId)
-
+    await supabase.from('cart_items').delete().eq('id', cartItemId)
     window.dispatchEvent(new Event('cartUpdated'))
   }
 
@@ -107,7 +103,9 @@ export default function Cart() {
               🛒
             </div>
             <h2 className="text-2xl font-semibold mb-2">Your cart is empty</h2>
-            <p className="text-slate-500">Add some products from the products page.</p>
+            <p className="text-slate-500">
+              Add some products from the products page.
+            </p>
           </div>
         ) : (
           <div className="grid lg:grid-cols-[1.35fr,0.65fr] gap-8">
@@ -121,7 +119,9 @@ export default function Cart() {
                     className="bg-white rounded-3xl border border-slate-100 p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row gap-5"
                   >
                     <img
-                      src={product.image_url || 'https://via.placeholder.com/300'}
+                      src={
+                        product.image_url || 'https://via.placeholder.com/300'
+                      }
                       alt={product.name || 'Product'}
                       className="w-full sm:w-32 h-32 object-cover rounded-2xl"
                     />
@@ -138,7 +138,10 @@ export default function Cart() {
                       <div className="mt-5 flex flex-wrap items-center gap-3">
                         <div className="flex items-center bg-slate-100 rounded-2xl overflow-hidden">
                           <button
-                            onClick={() => updateQuantity(item.id, item.quantity, 'decrease')}
+                            type="button"
+                            onClick={() =>
+                              updateQuantity(item.id, item.quantity, 'decrease')
+                            }
                             className="px-4 py-2 hover:bg-slate-200 text-lg"
                           >
                             -
@@ -149,7 +152,10 @@ export default function Cart() {
                           </span>
 
                           <button
-                            onClick={() => updateQuantity(item.id, item.quantity, 'increase')}
+                            type="button"
+                            onClick={() =>
+                              updateQuantity(item.id, item.quantity, 'increase')
+                            }
                             className="px-4 py-2 hover:bg-slate-200 text-lg"
                           >
                             +
@@ -157,6 +163,7 @@ export default function Cart() {
                         </div>
 
                         <button
+                          type="button"
                           onClick={() => removeItem(item.id)}
                           className="px-4 py-2 rounded-2xl bg-red-500 text-white hover:bg-red-600"
                         >
@@ -189,7 +196,9 @@ export default function Cart() {
 
                 <div className="flex justify-between text-slate-600">
                   <span>Total Quantity</span>
-                  <span>{cart.reduce((sum, item) => sum + item.quantity, 0)}</span>
+                  <span>
+                    {cart.reduce((sum, item) => sum + item.quantity, 0)}
+                  </span>
                 </div>
               </div>
 
@@ -198,7 +207,10 @@ export default function Cart() {
                 <span>₹{total}</span>
               </div>
 
-              <button className="w-full mt-6 bg-green-600 text-white py-3.5 rounded-2xl font-semibold hover:bg-green-700 transition">
+              <button
+                type="button"
+                className="w-full mt-6 bg-green-600 text-white py-3.5 rounded-2xl font-semibold hover:bg-green-700 transition"
+              >
                 Proceed to Checkout
               </button>
             </div>

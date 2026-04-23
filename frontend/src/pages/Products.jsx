@@ -18,7 +18,7 @@ export default function Products() {
     setLoading(true)
     setError('')
 
-    const { data, error } = await supabase
+    const { data, error: fetchError } = await supabase
       .from('products')
       .select(`
         *,
@@ -28,9 +28,8 @@ export default function Products() {
       .eq('is_active', true)
       .eq('is_approved', true)
 
-    if (error) {
-      console.error(error)
-      setError(error.message)
+    if (fetchError) {
+      setError(fetchError.message)
       setLoading(false)
       return
     }
@@ -40,10 +39,7 @@ export default function Products() {
   }
 
   const categories = useMemo(() => {
-    const names = products
-      .map((p) => p.categories?.name)
-      .filter(Boolean)
-
+    const names = products.map((p) => p.categories?.name).filter(Boolean)
     return ['All', ...new Set(names)]
   }, [products])
 
@@ -55,12 +51,12 @@ export default function Products() {
     }
 
     if (search.trim()) {
-      const q = search.toLowerCase()
+      const query = search.toLowerCase()
       data = data.filter(
         (item) =>
-          item.name?.toLowerCase().includes(q) ||
-          item.description?.toLowerCase().includes(q) ||
-          item.categories?.name?.toLowerCase().includes(q)
+          item.name?.toLowerCase().includes(query) ||
+          item.description?.toLowerCase().includes(query) ||
+          item.categories?.name?.toLowerCase().includes(query),
       )
     }
 
@@ -92,22 +88,32 @@ export default function Products() {
   return (
     <section className="min-h-screen bg-slate-50 px-4 py-8">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6">Products</h1>
+        <div className="mb-8">
+          <span className="inline-block rounded-full bg-green-100 px-4 py-1.5 text-sm font-semibold text-green-700">
+            Marketplace
+          </span>
+          <h1 className="mt-4 text-3xl sm:text-4xl font-bold text-slate-900">
+            Explore Products
+          </h1>
+          <p className="mt-2 text-slate-500">
+            Browse approved agricultural products from AgroMitra.
+          </p>
+        </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border p-4 mb-8">
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 sm:p-5 mb-8">
           <div className="grid md:grid-cols-3 gap-4">
             <input
               type="text"
               placeholder="Search products..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-12 rounded-xl border border-slate-200 px-4 outline-none focus:border-green-500"
+              className="w-full h-12 rounded-2xl border border-slate-200 px-4 outline-none focus:border-green-500"
             />
 
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full h-12 rounded-xl border border-slate-200 px-4 outline-none focus:border-green-500"
+              className="w-full h-12 rounded-2xl border border-slate-200 px-4 outline-none focus:border-green-500 bg-white"
             >
               {categories.map((item) => (
                 <option key={item} value={item}>
@@ -119,7 +125,7 @@ export default function Products() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="w-full h-12 rounded-xl border border-slate-200 px-4 outline-none focus:border-green-500"
+              className="w-full h-12 rounded-2xl border border-slate-200 px-4 outline-none focus:border-green-500 bg-white"
             >
               <option value="default">Sort By</option>
               <option value="priceLowToHigh">Price: Low to High</option>
@@ -129,12 +135,18 @@ export default function Products() {
           </div>
 
           <div className="mt-4 text-sm text-slate-500">
-            Showing <span className="font-semibold text-green-700">{filteredProducts.length}</span> products
+            Showing{' '}
+            <span className="font-semibold text-green-700">
+              {filteredProducts.length}
+            </span>{' '}
+            products
           </div>
         </div>
 
         {filteredProducts.length === 0 ? (
-          <p>No products found.</p>
+          <div className="bg-white rounded-3xl border border-slate-100 p-10 text-center">
+            <p className="text-slate-600">No products found.</p>
+          </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
             {filteredProducts.map((product) => (
