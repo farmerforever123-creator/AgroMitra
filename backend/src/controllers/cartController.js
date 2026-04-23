@@ -1,57 +1,135 @@
- export let carts = [];
+//  export let carts = [];
+ import { supabase } from "../config/supabase.js";
 
 // ADD TO CART
-export const addToCart = (req, res, next) => {
+export const addToCart = async (req, res, next) => {
   try {
     const userId = req.user.id;
-    let { productId, name, price, quantity } = req.body;
+    let { productId, quantity } = req.body;
 
-    if (!productId || !name || !price || quantity === undefined) {
-      return res.status(400).json({ message: "All fields required" });
+    // 🔒 Validation
+    if (!productId || quantity === undefined) {
+      return res.status(400).json({
+        message: "productId and quantity required",
+      });
     }
 
-    const priceNum = parseFloat(price);
     const qtyNum = parseInt(quantity, 10);
 
-    if (isNaN(priceNum) || priceNum < 0 || isNaN(qtyNum) || qtyNum <= 0) {
-      return res.status(400).json({ message: "Invalid price or quantity" });
+    if (isNaN(qtyNum) || qtyNum <= 0) {
+      return res.status(400).json({
+        message: "Invalid quantity",
+      });
     }
 
-    name = String(name).trim();
     productId = String(productId).trim();
 
-    let cart = carts.find((c) => c.userId === userId);
+    // 🔍 Check product exists (IMPORTANT SECURITY)
+    const { data: product, error: productError } = await supabase
+      .from("products")
+      .select("*")
+      .eq("id", productId)
+      .single();
 
-    if (!cart) {
-      cart = { userId, items: [] };
-      carts.push(cart);
+    if (productError || !product) {
+      return res.status(404).json({
+        message: "Product not found",
+      });
     }
 
-    // check if product already exists
-    const existingItem = cart.items.find(
-      (item) => item.productId === productId
-    );
+    // 🔍 Check if already in cart
+    const { data: existingItem } = await supabase
+      .from("cart")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("product_id", productId)
+      .single();
 
     if (existingItem) {
-      existingItem.quantity += qtyNum;
+      // 🔄 update quantity
+      const newQty = existingItem.quantity + qtyNum;
+
+      const { error: updateError } = await supabase
+        .from("cart")
+        .update({ quantity: newQty })
+        .eq("id", existingItem.id);
+
+      if (updateError) {
+        return res.status(400).json({
+          message: updateError.message,
+        });
+      }
     } else {
-      cart.items.push({ productId, name, price: priceNum, quantity: qtyNum });
+      // ➕ insert new item
+      const { error: insertError } = await supabase
+        .from("cart")
+        .insert([
+          {
+            user_id: userId,
+            product_id: productId,
+            quantity: qtyNum,
+          },
+        ]);
+
+      if (insertError) {
+        return res.status(400).json({
+          message: insertError.message,
+        });
+      }
     }
 
-    res.json({ message: "Added to cart", cart });
+    res.json({
+      message: "Added to cart successfully",
+    });
+
   } catch (error) {
     next(error);
   }
 };
 
-// GET CART
-export const getCart = (req, res, next) => {
-  try {
-    const cart = carts.find((c) => c.userId === req.user.id);
 
-    res.json(cart || { items: [] });
+
+
+
+
+
+
+
+
+
+// 🛒 GET CART (user specific)
+export const getCart = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // 🔍 fetch cart with product details (JOIN)
+    const { data, error } = await supabase
+      .from("cart")
+      .select(`
+        id,
+        quantity,
+        products (
+          id,
+          name,
+          price
+        )
+      `)
+      .eq("user_id", userId);
+
+    if (error) {
+      return res.status(400).json({
+        message: error.message,
+      });
+    }
+
+    res.json({
+      cart: data,
+    });
+
   } catch (error) {
-    next(error);
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };
 

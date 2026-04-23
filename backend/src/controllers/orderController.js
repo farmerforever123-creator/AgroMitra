@@ -1,44 +1,98 @@
-import { carts } from "./cartController.js"; // share carts
-let orders = [];
+ // share carts
+// let orders = [];
 
 // PLACE ORDER
-export const placeOrder = (req, res, next) => {
+import { supabase } from "../config/supabase.js";
+
+export const placeOrder = async (req, res, next) => {
   try {
     const userId = req.user.id;
 
-    const cart = carts.find((c) => c.userId === userId);
+    // 🛒 fetch cart
+    const { data: cartItems, error: cartError } = await supabase
+      .from("cart")
+      .select("*")
+      .eq("user_id", userId);
 
-    if (!cart || cart.items.length === 0) {
-      return res.status(400).json({ message: "Cart is empty" });
+    if (cartError) {
+      return res.status(400).json({
+        message: cartError.message,
+      });
     }
 
-    // calculate total
-    const totalAmount = cart.items.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0
-    );
+    if (!cartItems || cartItems.length === 0) {
+      return res.status(400).json({
+        message: "Cart is empty",
+      });
+    }
 
-    const order = {
-      id: Date.now(),
-      userId,
-      items: cart.items,
-      totalAmount,
-      status: "PLACED",
-    };
+    // 🔍 get product prices
+    const productIds = cartItems.map((item) => item.product_id);
 
-    orders.push(order);
+    const { data: products, error: productError } = await supabase
+      .from("products")
+      .select("id, price")
+      .in("id", productIds);
 
-    // clear cart
-    cart.items = [];
+    if (productError) {
+      return res.status(400).json({
+        message: productError.message,
+      });
+    }
+
+    // 🧠 create map
+    const priceMap = {};
+    products.forEach((p) => {
+      priceMap[p.id] = p.price;
+    });
+
+    // 💰 calculate total securely
+    let totalAmount = 0;
+
+    for (const item of cartItems) {
+      const price = priceMap[item.product_id];
+
+      if (!price) {
+        return res.status(400).json({
+          message: `Invalid product: ${item.product_id}`,
+        });
+      }
+
+      totalAmount += price * item.quantity;
+    }
+
+    // 📦 create order
+    const { data: order, error: orderError } = await supabase
+      .from("orders")
+      .insert([
+        {
+          user_id: userId,
+          total_amount: totalAmount,
+          status: "CREATED",
+        },
+      ])
+      .select()
+      .single();
+
+    if (orderError) {
+      return res.status(400).json({
+        message: orderError.message,
+      });
+    }
+
+    // 🧹 clear cart
+    await supabase.from("cart").delete().eq("user_id", userId);
 
     res.status(201).json({
       message: "Order placed successfully",
       order,
     });
+
   } catch (error) {
     next(error);
   }
 };
+
 
 // GET ORDERS
 export const getOrders = (req, res, next) => {
