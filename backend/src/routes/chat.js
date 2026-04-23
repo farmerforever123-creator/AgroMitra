@@ -3,24 +3,39 @@ import OpenAI from "openai";
 
 const router = express.Router();
 
-// ✅ Initialize OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// ✅ Lazy initialization
+let openai;
+
+const getOpenAI = () => {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY missing in .env");
+  }
+
+  if (!openai) {
+    openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+  }
+
+  return openai;
+};
 
 // ✅ POST /api/chat
 router.post("/", async (req, res) => {
   try {
     const { message } = req.body;
 
-    // 🧠 Basic validation
+    // 🧠 Validation
     if (!message) {
       return res.status(400).json({ reply: "Message is required" });
     }
 
     console.log("👤 User:", message);
 
-    // 🤖 OpenAI response
+    // ✅ Get OpenAI instance safely
+    const openai = getOpenAI();
+
+    // 🤖 AI response
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -31,14 +46,13 @@ You are AgroMitra AI, a smart farming assistant for Indian farmers.
 
 Your job:
 - Give simple, practical farming advice
-- Answer in easy language (Hindi or English depending on user)
+- Answer in Hindi or simple English
 - Help with crops, fertilizers, pesticides, weather, mandi prices
 
 Rules:
-- Keep answers short and useful
-- Use bullet points when helpful
-- Avoid complex scientific jargon
-- Focus on real farmer needs
+- Keep answers short
+- Use bullet points
+- Avoid complex terms
           `,
         },
         {
@@ -52,11 +66,17 @@ Rules:
 
     console.log("🤖 AI:", reply);
 
-    // ✅ Send response
     res.json({ reply });
 
   } catch (error) {
     console.error("❌ ERROR:", error.message);
+
+    // ✅ Better error handling
+    if (error.message.includes("OPENAI_API_KEY")) {
+      return res.status(500).json({
+        reply: "⚠️ AI service not configured properly.",
+      });
+    }
 
     res.status(500).json({
       reply: "⚠️ Server error. Please try again.",
