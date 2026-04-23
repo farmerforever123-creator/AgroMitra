@@ -3,28 +3,29 @@ let products = []; // mock DB
 // ADD PRODUCT (Farmer only)
 export const addProduct = async (req, res) => {
   try {
-    const { name, price } = req.body;
+    let { name, price } = req.body;
 
     if (!name || !price) {
       return res.status(400).json({
         message: "All fields required",
       });
     }
-   const priceNum = parseFloat(price);
 
-if (!name || isNaN(priceNum) || priceNum <= 0) {
-  return res.status(400).json({
-    message: "Invalid price",
-  });
-}
+    // sanitize
+    name = name.trim();
 
+    const priceNum = parseFloat(price);
 
-
+    if (isNaN(priceNum) || priceNum <= 0) {
+      return res.status(400).json({
+        message: "Invalid price",
+      });
+    }
 
     const product = {
       id: Date.now(),
       name,
-      price,
+      price: priceNum,
       image: req.file ? req.file.filename : null,
       farmerId: req.user.id,
     };
@@ -41,8 +42,12 @@ if (!name || isNaN(priceNum) || priceNum <= 0) {
 };
 
 // GET PRODUCTS (Public)
-export const getProducts = async (req, res) => {
-  res.json({
-    products,
-  });
+export const getProducts = async (req, res, next) => {
+  try {
+    res.json({
+      products,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
