@@ -245,6 +245,7 @@ import { generateToken } from "../utils/generateToken.js";
 import { OAuth2Client } from "google-auth-library";
 import { sendEmail } from "../utils/sendEmail.js";
 import { generateOTP } from "../utils/generateOTP.js";
+import { supabase } from "../config/supabase.js";
 
 // Dummy storage
 let users = [];
@@ -288,42 +289,52 @@ export const registerUser = async (req, res) => {
       return res.status(400).json({ message: errorMsg });
     }
 
-    const existingUser = users.find(
-      (u) => u.email.toLowerCase() === email.toLowerCase()
-    );
+    // 🔍 CHECK DUPLICATE FROM DB
+    const { data: existingUser } = await supabase
+      .from("users")
+      .select("*")
+      .eq("email", email)
+      .single();
 
     if (existingUser) {
-      return res.status(400).json({ message: "Email already registered" });
+      return res.status(400).json({
+        message: "Email already registered",
+      });
     }
 
+    // 🔐 HASH PASSWORD
     const hashedPassword = await bcrypt.hash(password, 10);
+
+    // 🔢 OTP GENERATE
     const otp = generateOTP();
 
-    const user = {
-      id: Date.now(),
-      name,
-      email,
-      password: hashedPassword,
-      role: "buyer", // ✅ buyer
+    // 💾 SAVE IN DATABASE
+    const { error } = await supabase.from("users").insert([
+      {
+        name,
+        email,
+        password: hashedPassword,
+        role: "buyer", // fixed role
+        is_verified: false,
+        otp,
+        otp_expiry: new Date(Date.now() + 5 * 60 * 1000),
+        otp_attempts: 0,
+      },
+    ]);
 
-      isVerified: false,
-      otp,
-      otpExpiry: Date.now() + 5 * 60 * 1000,
-      otpAttempts: 0,
-    };
+    if (error) {
+      return res.status(400).json({ message: error.message });
+    }
 
-    users.push(user);
     await sendEmail(email, otp);
 
     res.status(201).json({
       message: "Buyer registered. Verify OTP",
     });
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
-
 /**
  * =========================
  * REGISTER SELLER
@@ -338,42 +349,49 @@ export const registerSeller = async (req, res) => {
       return res.status(400).json({ message: errorMsg });
     }
 
-    const existingUser = users.find(
-      (u) => u.email.toLowerCase() === email.toLowerCase()
-    );
+    // 🔍 CHECK DUPLICATE FROM DB
+    const { data: existingUser } = await supabase
+      .from("users")
+      .select("*")
+      .eq("email", email)
+      .single();
 
     if (existingUser) {
-      return res.status(400).json({ message: "Email already registered" });
+      return res.status(400).json({
+        message: "Email already registered",
+      });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const otp = generateOTP();
 
-    const user = {
-      id: Date.now(),
-      name,
-      email,
-      password: hashedPassword,
-      role: "seller", // 🔥 seller role
+    // 💾 SAVE SELLER
+    const { error } = await supabase.from("users").insert([
+      {
+        name,
+        email,
+        password: hashedPassword,
+        role: "seller", // seller role
+        is_verified: false,
+        otp,
+        otp_expiry: new Date(Date.now() + 5 * 60 * 1000),
+        otp_attempts: 0,
+      },
+    ]);
 
-      isVerified: false,
-      otp,
-      otpExpiry: Date.now() + 5 * 60 * 1000,
-      otpAttempts: 0,
-    };
+    if (error) {
+      return res.status(400).json({ message: error.message });
+    }
 
-    users.push(user);
     await sendEmail(email, otp);
 
     res.status(201).json({
       message: "Seller registered. Verify OTP",
     });
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
-
 /**
  * =========================
  * VERIFY OTP
@@ -425,35 +443,55 @@ export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const user = users.find((u) => u.email === email);
+    // 🔍 DB से user fetch करो
+    const { data: user, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("email", email)
+      .single();
 
-    if (!user) {
-      return res.status(401).json({ message: "Invalid credentials" });
+    // ❌ user नहीं मिला
+    if (error || !user) {
+      return res.status(401).json({
+        message: "Invalid credentials",
+      });
     }
 
-    if (!user.isVerified) {
-      return res.status(401).json({
+    // 🔒 email verify check
+    if (!user.is_verified) {
+      return res.status(403).json({
         message: "Please verify your email first",
       });
     }
 
+    // 🔐 password compare
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-      return res.status(401).json({ message: "Invalid credentials" });
+      return res.status(401).json({
+        message: "Invalid credentials",
+      });
     }
+
+    // ✅ token generate
+    const token = generateToken({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    });
 
     res.json({
       message: "Login successful",
-      token: generateToken(user),
-      role: user.role // 🔥 frontend ko bhi milega
+      token,
+      role: user.role,
     });
 
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };
-
 /**
  * =========================
  * GOOGLE LOGIN

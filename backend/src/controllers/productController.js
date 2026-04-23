@@ -1,53 +1,63 @@
-let products = []; // mock DB
+// let products = []; // mock DB
 
 // ADD PRODUCT (Farmer only)
+import { supabase } from "../config/supabase.js";
+
 export const addProduct = async (req, res) => {
   try {
-    let { name, price } = req.body;
-
+    const { name, price } = req.body;
     if (!name || !price) {
       return res.status(400).json({
-        message: "All fields required",
+        message: "Name and price required",
       });
     }
 
-    // sanitize
-    name = name.trim();
+    const { data, error } = await supabase
+      .from("products")
+      .insert([
+        {
+          name,
+          price,
+          farmer_id: req.user.id,
+        },
+      ]);
 
-    const priceNum = parseFloat(price);
-
-    if (isNaN(priceNum) || priceNum <= 0) {
-      return res.status(400).json({
-        message: "Invalid price",
-      });
+    if (error) {
+      return res.status(400).json({ message: error.message });
     }
-
-    const product = {
-      id: Date.now(),
-      name,
-      price: priceNum,
-      image: req.file ? req.file.filename : null,
-      farmerId: req.user.id,
-    };
-
-    products.push(product);
 
     res.status(201).json({
       message: "Product added successfully",
-      product,
+      data,
     });
+
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
+
 // GET PRODUCTS (Public)
-export const getProducts = async (req, res, next) => {
+export const getProducts = async (req, res) => {
   try {
-    res.json({
-      products,
+    const { data, error } = await supabase
+      .from("products")
+      .select(`
+        *,
+        categories(name),
+        product_images(image_url)
+      `)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.status(200).json({
+      success: true,
+      products: data,
     });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 };
