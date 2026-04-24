@@ -15,9 +15,10 @@ export default function Cart() {
   async function fetchCart() {
     setLoading(true)
 
-    const { data: userData } = await supabase.auth.getUser()
+    const { data: userData } = await supabase.auth.getUser();
+    const currentUser = userData?.user;
 
-    if (!userData.user) {
+    if (!currentUser) {
       setMessage('Please login to view your cart.')
       setLoading(false)
       return
@@ -40,7 +41,7 @@ export default function Cart() {
           )
         )
       `)
-      .eq('user_id', userData.user.id)
+      .eq('user_id', currentUser.id)
       .order('created_at', { ascending: false })
 
     if (error) {

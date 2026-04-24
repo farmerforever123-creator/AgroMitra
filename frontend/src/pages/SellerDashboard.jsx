@@ -24,24 +24,58 @@ export default function SellerDashboard() {
     loadSellerData();
   }, []);
 
-  async function loadSellerData() {
-    const { data: userData } = await supabase.auth.getUser();
+  function createSlug(name) {
+    return (
+      name
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)+/g, "") +
+      "-" +
+      Date.now()
+    );
+  }
 
-    if (!userData?.user) {
+  async function getCurrentUser() {
+    const { data } = await supabase.auth.getUser();
+
+    if (data?.user) return data.user;
+
+    const userStr = localStorage.getItem("user");
+
+    if (!userStr) return null;
+
+    try {
+      return JSON.parse(userStr);
+    } catch {
+      return null;
+    }
+  }
+
+  async function loadSellerData() {
+    setMessage("");
+
+    const currentUser = await getCurrentUser();
+
+    if (!currentUser) {
       setMessage("Please login as seller first.");
       return;
     }
 
-    setUser(userData.user);
+    setUser(currentUser);
 
-    const { data: categoryData } = await supabase
+    const { data: categoryData, error: categoryError } = await supabase
       .from("categories")
       .select("*")
       .order("name", { ascending: true });
 
-    setCategories(categoryData || []);
+    if (categoryError) {
+      setMessage(categoryError.message);
+      return;
+    }
 
-    await fetchProducts(userData.user.id);
+    setCategories(categoryData || []);
+    await fetchProducts(currentUser.id);
   }
 
   async function fetchProducts(userId) {
@@ -49,14 +83,18 @@ export default function SellerDashboard() {
       .from("products")
       .select(`
         *,
-        categories(name)
+        categories(name),
+        product_images(image_url, is_primary)
       `)
-      .eq("seller_id", userId)
+      .eq("farmer_id", userId)
       .order("created_at", { ascending: false });
 
-    if (!error) {
-      setProducts(data || []);
+    if (error) {
+      setMessage(error.message);
+      return;
     }
+
+    setProducts(data || []);
   }
 
   function handleChange(e) {
@@ -76,7 +114,7 @@ export default function SellerDashboard() {
       return;
     }
 
-    if (!formData.name || !formData.price || !formData.stock_quantity) {
+    if (!formData.name.trim() || !formData.price || !formData.stock_quantity) {
       setMessage("Product name, price and stock are required.");
       return;
     }
@@ -85,31 +123,38 @@ export default function SellerDashboard() {
       setLoading(true);
       setMessage("");
 
+      const slug = createSlug(formData.name);
+
       const { data: productData, error: productError } = await supabase
         .from("products")
         .insert({
-          seller_id: user.id,
+          farmer_id: user.id,
           category_id: formData.category_id || null,
-          name: formData.name,
-          description: formData.description,
+          name: formData.name.trim(),
+          slug,
+          description: formData.description.trim(),
           price: Number(formData.price),
           stock_quantity: Number(formData.stock_quantity),
           unit: formData.unit,
-          status: "active",
+          is_active: true,
+          is_approved: true,
         })
         .select()
         .single();
 
-      if (productError) {
-        throw productError;
-      }
+      if (productError) throw productError;
 
-      if (formData.image_url && productData?.id) {
-        await supabase.from("product_images").insert({
-          product_id: productData.id,
-          image_url: formData.image_url,
-          is_primary: true,
-        });
+      if (formData.image_url.trim() && productData?.id) {
+        const { error: imageError } = await supabase
+          .from("product_images")
+          .insert({
+            product_id: productData.id,
+            image_url: formData.image_url.trim(),
+            is_primary: true,
+            sort_order: 1,
+          });
+
+        if (imageError) throw imageError;
       }
 
       setMessage("Product added successfully.");
@@ -130,6 +175,12 @@ export default function SellerDashboard() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function getProductStatus(product) {
+    if (!product.is_active) return "Inactive";
+    if (!product.is_approved) return "Pending";
+    return "Active";
   }
 
   return (
@@ -266,7 +317,7 @@ export default function SellerDashboard() {
                       </span>
                     </div>
 
-                    <strong>{product.status}</strong>
+                    <strong>{getProductStatus(product)}</strong>
                   </div>
                 ))
               )}

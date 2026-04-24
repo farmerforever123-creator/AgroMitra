@@ -18,46 +18,44 @@ export default function BuyerLogin() {
     setError('')
 
     try {
-      const { data, error: loginError } = await supabase.auth.signInWithPassword({
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
-      })
+      });
 
-      if (loginError) {
-        setError(loginError.message)
-        return
-      }
+      if (authError) throw authError;
 
-      const userId = data.user?.id
-
-      if (!userId) {
-        setError('Login failed. User not found.')
-        return
-      }
+      const user = authData.user;
 
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role')
-        .eq('id', userId)
-        .single()
+        .eq('id', user.id)
+        .single();
 
-      if (profileError) {
-        setError(profileError.message)
-        await supabase.auth.signOut()
-        return
+      if (profileError || !profile) {
+        throw new Error('Profile not found.');
       }
 
-      if (profile?.role !== 'buyer') {
-        setError('This account is not registered as a buyer.')
-        await supabase.auth.signOut()
-        return
+      if (profile.role !== 'buyer') {
+        await supabase.auth.signOut();
+        throw new Error('This account is not registered as a buyer.');
       }
 
-      navigate('/products')
+      // Log the login using the backend API
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+      await fetch(`${API_BASE_URL}/auth/login-log`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: user.id, email: user.email, role: profile.role })
+      }).catch(console.error);
+
+      window.dispatchEvent(new Event('authChange'));
+      navigate('/products');
     } catch (err) {
-      setError(err.message || 'Something went wrong. Please try again.')
+      setError(err.message || 'Something went wrong. Please try again.');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 

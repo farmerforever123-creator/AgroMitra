@@ -1,6 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
-import { supabase } from '../lib/supabase'
 import { sendRegisterOtp, verifyRegisterOtp } from '../services/registerOtpService'
 import '../components/landing.css'
 
@@ -9,7 +8,6 @@ export default function Register() {
 
   const [step, setStep] = useState('register')
   const [otp, setOtp] = useState('')
-  const [devOtp, setDevOtp] = useState('')
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -35,8 +33,7 @@ export default function Register() {
     setSuccess('')
 
     try {
-      const result = await sendRegisterOtp(formData)
-      setDevOtp(result.devOtp || '')
+      await sendRegisterOtp(formData)
       setSuccess('OTP sent successfully. Please verify your email.')
       setStep('otp')
     } catch (err) {
@@ -53,43 +50,13 @@ export default function Register() {
     setSuccess('')
 
     try {
-      const result = await verifyRegisterOtp(formData.email, otp)
-      const userData = result.user || formData
-
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email: userData.email,
-        password: userData.password,
-        options: {
-          data: {
-            full_name: userData.full_name,
-            phone: userData.phone,
-            role: userData.role,
-          },
-        },
-      })
-
-      if (signUpError) throw signUpError
-
-      const userId = data.user?.id
-
-      if (userId) {
-        const { error: profileError } = await supabase.from('profiles').upsert({
-          id: userId,
-          full_name: userData.full_name,
-          email: userData.email,
-          phone: userData.phone,
-          role: userData.role,
-          is_verified: true,
-        })
-
-        if (profileError) throw profileError
-      }
-
+      await verifyRegisterOtp({ ...formData, otp })
+      
       setSuccess('Registration successful. Redirecting...')
 
       setTimeout(() => {
-        navigate(userData.role === 'buyer' ? '/buyer-login' : '/seller-login')
-      }, 1200)
+        navigate(formData.role === 'buyer' ? '/buyer-login' : '/seller-login')
+      }, 1500)
     } catch (err) {
       setError(err.message || 'OTP verification failed.')
     } finally {
@@ -238,12 +205,6 @@ export default function Register() {
               </form>
             ) : (
               <form onSubmit={handleVerifyOtp} className="register-form">
-                {devOtp && (
-                  <div className="otp-test-box">
-                    Testing OTP: <b>{devOtp}</b>
-                  </div>
-                )}
-
                 <div className="register-form-group">
                   <label>Enter OTP</label>
                   <input

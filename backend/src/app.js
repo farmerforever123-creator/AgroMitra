@@ -4,7 +4,6 @@ import helmet from "helmet";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
 
-import authRoutes from "./routes/authRoutes.js";
 import authOtpRoutes from "./routes/authOtpRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
 import cartRoutes from "./routes/cartRoutes.js";
@@ -37,7 +36,6 @@ app.use(limiter);
 
 app.use("/uploads", express.static("uploads"));
 
-app.use("/api/auth", authRoutes);
 app.use("/api/auth", authOtpRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/cart", cartRoutes);
@@ -45,4 +43,4 @@ app.use("/api/orders", orderRoutes);
 
 app.use(errorHandler);
 
-export default app;
+export default app;

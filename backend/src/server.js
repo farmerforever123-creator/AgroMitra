@@ -1,16 +1,9 @@
-import express from "express";
-import cors from "cors";
 import dotenv from "dotenv";
+import app from "./app.js";
 import chatRoute from "./routes/chat.js";
 
 // 🔐 Load env variables
 dotenv.config();
-
-const app = express();
-
-// ✅ Middleware
-app.use(cors());
-app.use(express.json());
 
 // ✅ Test route (important for debugging)
 app.get("/", (req, res) => {

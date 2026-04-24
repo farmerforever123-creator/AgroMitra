@@ -43,6 +43,7 @@ export async function sendRegisterOtp(req, res) {
 export async function verifyRegisterOtp(req, res) {
   try {
     const { full_name, email, phone, password, role, otp } = req.body;
+    console.log("verifyRegisterOtp received body:", req.body);
 
     if (!full_name || !email || !password || !role || !otp) {
       return res.status(400).json({ message: "All required fields are missing" });
@@ -79,7 +80,10 @@ export async function verifyRegisterOtp(req, res) {
         },
       });
 
-    if (authError) throw authError;
+    if (authError) {
+      console.error("Supabase Admin createUser authError:", authError);
+      throw authError;
+    }
 
     const userId = authData.user.id;
 
@@ -92,7 +96,10 @@ export async function verifyRegisterOtp(req, res) {
       is_verified: true,
     });
 
-    if (profileError) throw profileError;
+    if (profileError) {
+      console.error("Supabase Admin profiles upsert profileError:", profileError);
+      throw profileError;
+    }
 
     await supabaseAdmin
       .from("otp_verifications")
@@ -104,7 +111,8 @@ export async function verifyRegisterOtp(req, res) {
       user: authData.user,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message || "Registration failed" });
+    console.error("verifyRegisterOtp error catch block:", error);
+    res.status(500).json({ message: error?.message || "Registration failed" });
   }
 }
 

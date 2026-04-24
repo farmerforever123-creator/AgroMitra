@@ -15,8 +15,8 @@ export default function ProductCard({ product }) {
     setAdding(true)
 
     try {
-      const { data } = await supabase.auth.getUser()
-      const user = data.user
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData?.user;
 
       if (!user) {
         alert('Please login as buyer first.')

@@ -23,10 +23,12 @@ export default function Navbar() {
   }, [])
 
   async function loadUserAndCart() {
-    const { data } = await supabase.auth.getUser()
-    setUser(data.user)
+    const { data: userData } = await supabase.auth.getUser();
+    const currentUser = userData?.user;
 
-    if (!data.user) {
+    setUser(currentUser)
+
+    if (!currentUser) {
       setCartCount(0)
       return
     }
@@ -34,7 +36,7 @@ export default function Navbar() {
     const { count } = await supabase
       .from('cart_items')
       .select('*', { count: 'exact', head: true })
-      .eq('user_id', data.user.id)
+      .eq('user_id', currentUser.id)
 
     setCartCount(count || 0)
   }
