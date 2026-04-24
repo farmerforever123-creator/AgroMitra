@@ -10,8 +10,11 @@ import BuyerLogin from './pages/BuyerLogin.jsx'
 import SellerLogin from './pages/SellerLogin.jsx'
 import Chatbot from "./components/Chatbot";
 import Cart from './pages/Cart.jsx'
+<<<<<<< HEAD
 import "./components/landing.css";
 import SellerDashboard from "./pages/SellerDashboard";
+=======
+>>>>>>> 73b94e7464bcb9c717fe7abd6e3e498f3165aa82
 
 function App() {
   return (
@@ -30,7 +33,10 @@ function App() {
               <Route path="/buyer-login" element={<BuyerLogin />} />
               <Route path="/seller-login" element={<SellerLogin />} />
               <Route path="/cart" element={<Cart />} />
+<<<<<<< HEAD
               <Route path="/seller-dashboard" element={<SellerDashboard />} />
+=======
+>>>>>>> 73b94e7464bcb9c717fe7abd6e3e498f3165aa82
             </Routes>
           </main>
 

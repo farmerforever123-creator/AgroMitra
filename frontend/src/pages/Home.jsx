@@ -26,6 +26,7 @@ function StatsSection() {
   )
 }
 
+<<<<<<< HEAD
 function CategoryShowcase() {
   const categories = [
     { icon: '🌱', title: 'Seeds', text: 'Quality seeds for better yield' },
@@ -88,6 +89,8 @@ function FeaturedProductsPreview() {
   )
 }
 
+=======
+>>>>>>> 73b94e7464bcb9c717fe7abd6e3e498f3165aa82
 function CTASection() {
   return (
     <section className="home-cta">
@@ -119,8 +122,11 @@ export default function Home() {
     <>
       <Hero />
       <StatsSection />
+<<<<<<< HEAD
       <CategoryShowcase />
       <FeaturedProductsPreview />
+=======
+>>>>>>> 73b94e7464bcb9c717fe7abd6e3e498f3165aa82
       <About />
       <Features />
       <Reviews />
