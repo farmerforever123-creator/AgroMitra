@@ -2,57 +2,44 @@ import './landing.css'
 
 const features = [
   {
-    icon: '🌾',
-    title: 'Direct Farmer to Buyer',
+    icon: '🛒',
+    title: 'Buy Quality Produce',
     description:
-      'Connect farmers and buyers directly with a trusted and simplified selling flow.',
+      'Access a wide range of fresh, verified agricultural products directly from trusted farmers at the best market rates.',
   },
   {
-    icon: '💰',
-    title: 'Real-time Pricing',
+    icon: '🤝',
+    title: 'Sell with Confidence',
     description:
-      'Fair and transparent pricing to help users make better buying decisions.',
+      'List your farm inventory easily, reach thousands of buyers instantly, and secure faster payments without middlemen.',
   },
   {
-    icon: '🛡️',
-    title: 'Secure Experience',
+    icon: '📊',
+    title: 'Smart Analytics',
     description:
-      'Reliable authentication, cleaner access flow, and safer marketplace usage.',
-  },
-  {
-    icon: '📦',
-    title: 'Easy Product Listing',
-    description:
-      'Showcase and discover agricultural products through a modern catalog experience.',
+      'Track your sales, analyze market trends, and make data-driven decisions to grow your agricultural business.',
   },
 ]
 
 export default function Features() {
   return (
-    <section className="section features-section premium-features-section">
-      <div className="container">
-        <div className="section-head reveal-up">
-          <span className="section-badge">Features</span>
-          <h2>Everything needed for a better agri marketplace</h2>
-          <p>
-            AgroMitra is designed to create a cleaner, faster, and more
-            professional buying and selling experience for modern agriculture.
-          </p>
-        </div>
+    <section className="why-choose-section">
+      <div className="section-head reveal-up">
+        <span className="section-badge" style={{ background: '#dcfce7', color: '#16a34a', padding: '8px 16px', borderRadius: '20px', fontWeight: 'bold' }}>Why Choose AgroMitra?</span>
+        <h2 style={{ fontSize: '40px', marginTop: '16px' }}>Everything needed for better farming</h2>
+      </div>
 
-        <div className="feature-grid premium-feature-grid">
-          {features.map((feature, index) => (
-            <div
-              key={feature.title}
-              className={`feature-card premium-feature-card reveal-up reveal-delay-${(index % 4) + 1}`}
-            >
-              <div className="feature-icon">{feature.icon}</div>
-              <h3>{feature.title}</h3>
-              <p>{feature.description}</p>
-              <span className="feature-link">Learn more →</span>
-            </div>
-          ))}
-        </div>
+      <div className="why-choose-grid">
+        {features.map((feature, index) => (
+          <div
+            key={feature.title}
+            className={`why-card reveal-up reveal-delay-${(index % 4) + 1}`}
+          >
+            <div className="why-icon">{feature.icon}</div>
+            <h3>{feature.title}</h3>
+            <p>{feature.description}</p>
+          </div>
+        ))}
       </div>
     </section>
   )

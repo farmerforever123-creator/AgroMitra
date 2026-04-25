@@ -1,25 +1,10 @@
-<<<<<<< HEAD
 import dotenv from "dotenv";
 import app from "./app.js";
-=======
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
->>>>>>> 73b94e7464bcb9c717fe7abd6e3e498f3165aa82
 import chatRoute from "./routes/chat.js";
 
 // 🔐 Load env variables
 dotenv.config();
 
-<<<<<<< HEAD
-=======
-const app = express();
-
-// ✅ Middleware
-app.use(cors());
-app.use(express.json());
-
->>>>>>> 73b94e7464bcb9c717fe7abd6e3e498f3165aa82
 // ✅ Test route (important for debugging)
 app.get("/", (req, res) => {
   res.send("🚀 AgroMitra AI Backend Running");

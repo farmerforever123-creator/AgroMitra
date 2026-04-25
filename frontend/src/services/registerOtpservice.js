@@ -35,3 +35,21 @@ export const verifyRegisterOtp = async (payload) => {
 
   return data;
 };
+
+export const verifyGst = async (payload) => {
+  const res = await fetch(`${API_BASE_URL}/auth/seller/verify-gst`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.message || "GST verification failed");
+  }
+
+  return data;
+};
