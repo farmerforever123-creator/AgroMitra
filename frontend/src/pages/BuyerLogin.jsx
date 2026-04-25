@@ -1,18 +1,11 @@
-<<<<<<< HEAD
 import { Link, useNavigate } from 'react-router-dom'
-=======
-import { Link } from 'react-router-dom'
->>>>>>> 73b94e7464bcb9c717fe7abd6e3e498f3165aa82
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import '../components/landing.css'
 
 export default function BuyerLogin() {
-<<<<<<< HEAD
   const navigate = useNavigate()
 
-=======
->>>>>>> 73b94e7464bcb9c717fe7abd6e3e498f3165aa82
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -25,7 +18,6 @@ export default function BuyerLogin() {
     setError('')
 
     try {
-<<<<<<< HEAD
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -34,25 +26,10 @@ export default function BuyerLogin() {
       if (authError) throw authError;
 
       const user = authData.user;
-=======
-      const { data, error: loginError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (loginError) {
-        setError(loginError.message)
-        setLoading(false)
-        return
-      }
-
-      const userId = data.user.id
->>>>>>> 73b94e7464bcb9c717fe7abd6e3e498f3165aa82
 
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role')
-<<<<<<< HEAD
         .eq('id', user.id)
         .single();
 
@@ -79,28 +56,6 @@ export default function BuyerLogin() {
       setError(err.message || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
-=======
-        .eq('id', userId)
-        .single()
-
-      if (profileError) {
-        setError(profileError.message)
-        setLoading(false)
-        return
-      }
-
-      if (profile.role !== 'buyer') {
-        setError('This account is not registered as a buyer.')
-        await supabase.auth.signOut()
-        setLoading(false)
-        return
-      }
-
-      window.location.href = '/products'
-    } catch {
-      setError('Something went wrong. Please try again.')
-      setLoading(false)
->>>>>>> 73b94e7464bcb9c717fe7abd6e3e498f3165aa82
     }
   }
 
@@ -147,11 +102,7 @@ export default function BuyerLogin() {
               <p>Login to continue shopping and manage your AgroMitra cart.</p>
             </div>
 
-<<<<<<< HEAD
             {error && <div className="buyer-login-error">{error}</div>}
-=======
-            {error ? <div className="buyer-login-error">{error}</div> : null}
->>>>>>> 73b94e7464bcb9c717fe7abd6e3e498f3165aa82
 
             <form onSubmit={handleSubmit} className="buyer-login-form">
               <div className="buyer-form-group">
@@ -175,10 +126,6 @@ export default function BuyerLogin() {
                     onChange={(event) => setPassword(event.target.value)}
                     required
                   />
-<<<<<<< HEAD
-
-=======
->>>>>>> 73b94e7464bcb9c717fe7abd6e3e498f3165aa82
                   <button
                     type="button"
                     className="password-toggle"

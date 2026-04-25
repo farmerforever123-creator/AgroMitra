@@ -42,7 +42,7 @@ export async function sendRegisterOtp(req, res) {
 
 export async function verifyRegisterOtp(req, res) {
   try {
-    const { full_name, email, phone, password, role, otp } = req.body;
+    const { full_name, email, phone, password, role, otp, gst_number, gst_verified, business_name } = req.body;
     console.log("verifyRegisterOtp received body:", req.body);
 
     if (!full_name || !email || !password || !role || !otp) {
@@ -87,14 +87,23 @@ export async function verifyRegisterOtp(req, res) {
 
     const userId = authData.user.id;
 
-    const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
+    const profileData = {
       id: userId,
       full_name,
       email,
       phone,
       role,
       is_verified: true,
-    });
+    };
+
+    if (role === "farmer" && gst_number) {
+      profileData.gst_number = gst_number;
+      profileData.gst_verified = gst_verified || false;
+      profileData.business_name = business_name || null;
+      profileData.gst_verified_at = gst_verified ? new Date().toISOString() : null;
+    }
+
+    const { error: profileError } = await supabaseAdmin.from("profiles").upsert(profileData);
 
     if (profileError) {
       console.error("Supabase Admin profiles upsert profileError:", profileError);
