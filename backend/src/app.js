@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
+import chatRoutes from "./routes/chat.js";
 
 import authRoutes from "./routes/authRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
@@ -11,6 +12,8 @@ import orderRoutes from "./routes/orderRoutes.js";
 import { errorHandler } from "./middleware/errorMiddleware.js";
 
 const app = express();
+
+app.use("/api/chat", chatRoutes);
 
 //  Security Middlewares
 app.use(helmet()); // secure headers
