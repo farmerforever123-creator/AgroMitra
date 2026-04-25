@@ -1,85 +1,94 @@
 import express from "express";
-import OpenAI from "openai";
+import axios from "axios";
 
 const router = express.Router();
 
-// ✅ Lazy initialization
-let openai;
-
-const getOpenAI = () => {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error("OPENAI_API_KEY missing in .env");
-  }
-
-  if (!openai) {
-    openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-  }
-
-  return openai;
-};
-
-// ✅ POST /api/chat
 router.post("/", async (req, res) => {
   try {
-    const { message } = req.body;
+    const { message, lang } = req.body;
 
-    // 🧠 Validation
+    // ✅ Validation
     if (!message) {
       return res.status(400).json({ reply: "Message is required" });
     }
 
     console.log("👤 User:", message);
+    console.log("🌐 Lang:", lang);
 
-    // ✅ Get OpenAI instance safely
-    const openai = getOpenAI();
+    // 🔥 Detect explicit override from user (optional)
+    const wantsHindi =
+      /[\u0900-\u097F]/.test(message) ||
+      message.toLowerCase().includes("hindi");
 
-    // 🤖 AI response
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `
-You are AgroMitra AI, a smart farming assistant for Indian farmers.
+    const wantsEnglish =
+      message.toLowerCase().includes("english");
 
-Your job:
-- Give simple, practical farming advice
-- Answer in Hindi or simple English
-- Help with crops, fertilizers, pesticides, weather, mandi prices
+    // 🎯 FINAL LANGUAGE DECISION
+    let finalLang = "en";
+
+    if (wantsHindi) finalLang = "hi";
+    else if (wantsEnglish) finalLang = "en";
+    else if (lang === "hi") finalLang = "hi";
+    else finalLang = "en";
+
+    // 🧠 SYSTEM PROMPT (STRICT + CONTROLLED)
+    const systemPrompt =
+      finalLang === "hi"
+        ? `
+आप AgroMitra AI हैं, एक स्मार्ट कृषि सहायक।
+
+नियम:
+- केवल हिंदी में उत्तर दें
+- उत्तर छोटा, स्पष्ट और उपयोगी रखें
+- बुलेट पॉइंट्स में जवाब दें (जहाँ ज़रूरी हो)
+- कठिन शब्दों से बचें
+- केवल किसान से संबंधित व्यावहारिक सलाह दें
+`
+        : `
+You are AgroMitra AI, a smart farming assistant.
 
 Rules:
-- Keep answers short
-- Use bullet points
-- Avoid complex terms
-          `,
-        },
-        {
-          role: "user",
-          content: message,
-        },
-      ],
-    });
+- Reply ONLY in English
+- Keep answers short and practical
+- Use bullet points when helpful
+- Avoid complex words
+- Focus on real farming solutions
+`;
 
-    const reply = completion.choices[0].message.content;
+    // 🚀 API CALL
+    const response = await axios.post(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        model: "meta-llama/llama-3-8b-instruct",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: message }
+        ],
+        temperature: 0.5 // more stable answers
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    // ✅ SAFE RESPONSE PARSE
+    const reply =
+      response.data?.choices?.[0]?.message?.content?.trim() ||
+      "No response from AI";
 
     console.log("🤖 AI:", reply);
 
-    res.json({ reply });
+    return res.json({ reply });
 
-  } catch (error) {
-    console.error("❌ ERROR:", error.message);
+  } catch (err) {
+    console.error("❌ FULL ERROR:", err.message);
+    console.error("❌ RESPONSE:", err.response?.data);
 
-    // ✅ Better error handling
-    if (error.message.includes("OPENAI_API_KEY")) {
-      return res.status(500).json({
-        reply: "⚠️ AI service not configured properly.",
-      });
-    }
-
-    res.status(500).json({
-      reply: "⚠️ Server error. Please try again.",
+    return res.status(500).json({
+      reply: "⚠️ Server error. Please try again."
     });
   }
 });

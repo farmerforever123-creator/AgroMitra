@@ -1,4 +1,5 @@
 import React from 'react'
+import { Routes, Route } from 'react-router-dom'
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
 import Navbar from './components/Navbar.jsx'
 import Footer from './components/Footer.jsx'
@@ -29,6 +30,25 @@ function AppShell() {
 
   return (
     <>
+      <div className="app-shell">
+
+        <Navbar />
+
+        <main>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/products" element={<Products />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/buyer-login" element={<BuyerLogin />} />
+            <Route path="/seller-login" element={<SellerLogin />} />
+            <Route path="/cart" element={<Cart />} />
+          </Routes>
+        </main>
+
+        <Footer />
+
+      </div>
       {!isStandalone && <Navbar />}
 
       <main>
@@ -58,6 +78,7 @@ function AppShell() {
   );
 }
 
+export default App;
 function App() {
   return (
     <Router>
