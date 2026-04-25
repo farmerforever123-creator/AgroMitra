@@ -1,7 +1,6 @@
-import express from "express";
-import cors from "cors";
 import dotenv from "dotenv";
 import axios from "axios";
+import app from "./app.js";
 import chatRoute from "./routes/chat.js";
 
 // 🔐 Load env
@@ -14,6 +13,7 @@ app.use(cors());
 app.use(express.json());
 
 // ✅ Test route
+// ✅ Test route (important for debugging)
 app.get("/", (req, res) => {
   res.send("🚀 AgroMitra AI Backend Running");
 });

@@ -1,9 +1,11 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import '../components/landing.css'
 
 export default function BuyerLogin() {
+  const navigate = useNavigate()
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -16,42 +18,44 @@ export default function BuyerLogin() {
     setError('')
 
     try {
-      const { data, error: loginError } = await supabase.auth.signInWithPassword({
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
-      })
+      });
 
-      if (loginError) {
-        setError(loginError.message)
-        setLoading(false)
-        return
-      }
+      if (authError) throw authError;
 
-      const userId = data.user.id
+      const user = authData.user;
 
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role')
-        .eq('id', userId)
-        .single()
+        .eq('id', user.id)
+        .single();
 
-      if (profileError) {
-        setError(profileError.message)
-        setLoading(false)
-        return
+      if (profileError || !profile) {
+        throw new Error('Profile not found.');
       }
 
       if (profile.role !== 'buyer') {
-        setError('This account is not registered as a buyer.')
-        await supabase.auth.signOut()
-        setLoading(false)
-        return
+        await supabase.auth.signOut();
+        throw new Error('This account is not registered as a buyer.');
       }
 
-      window.location.href = '/products'
-    } catch {
-      setError('Something went wrong. Please try again.')
-      setLoading(false)
+      // Log the login using the backend API
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+      await fetch(`${API_BASE_URL}/auth/login-log`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: user.id, email: user.email, role: profile.role })
+      }).catch(console.error);
+
+      window.dispatchEvent(new Event('authChange'));
+      navigate('/products');
+    } catch (err) {
+      setError(err.message || 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -98,7 +102,7 @@ export default function BuyerLogin() {
               <p>Login to continue shopping and manage your AgroMitra cart.</p>
             </div>
 
-            {error ? <div className="buyer-login-error">{error}</div> : null}
+            {error && <div className="buyer-login-error">{error}</div>}
 
             <form onSubmit={handleSubmit} className="buyer-login-form">
               <div className="buyer-form-group">

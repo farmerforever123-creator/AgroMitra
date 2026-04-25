@@ -1,10 +1,21 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
-import { supabase } from '../lib/supabase'
+import {
+  sendRegisterOtp,
+  verifyRegisterOtp,
+  verifyGst,
+} from '../services/registerOtpService'
 import '../components/landing.css'
+
+const GST_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/
 
 export default function Register() {
   const navigate = useNavigate()
+
+  // step can be: 'register', 'otp'
+  const [step, setStep] = useState('register')
+  const [otp, setOtp] = useState('')
+  const [gstData, setGstData] = useState(null)
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -12,6 +23,7 @@ export default function Register() {
     password: '',
     phone: '',
     role: 'buyer',
+    gst_number: '',
   })
 
   const [showPassword, setShowPassword] = useState(false)
@@ -27,57 +39,78 @@ export default function Register() {
     }))
   }
 
-  async function handleSubmit(event) {
-    event.preventDefault()
+  async function handleInitialSubmit(e) {
+    e.preventDefault()
     setLoading(true)
     setError('')
     setSuccess('')
 
     try {
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            full_name: formData.full_name,
-            phone: formData.phone,
-            role: formData.role,
-          },
-        },
-      })
+      if (formData.role === 'farmer') {
+        // Validate GST format on frontend
+        if (!GST_REGEX.test(formData.gst_number)) {
+          throw new Error('Invalid GST number format. Must be 15 characters in valid GSTIN format (e.g., 22AAAAA0000A1Z5).')
+        }
 
-      if (signUpError) {
-        setError(signUpError.message)
-        setLoading(false)
-        return
-      }
+        // Call backend GST verification
+        const gstResult = await verifyGst({ gst_number: formData.gst_number })
 
-      const userId = data.user?.id
+        if (!gstResult.gst_verified) {
+          throw new Error(gstResult.message || 'GST verification failed.')
+        }
 
-      if (userId) {
-        const { error: profileError } = await supabase.from('profiles').upsert({
-          id: userId,
-          full_name: formData.full_name,
-          email: formData.email,
-          phone: formData.phone,
-          role: formData.role,
+        // Save GST verification data for later use during OTP verify
+        setGstData({
+          gst_number: formData.gst_number,
+          gst_verified: gstResult.gst_verified,
+          business_name: gstResult.business_name,
         })
 
-        if (profileError) {
-          setError(profileError.message)
-          setLoading(false)
-          return
-        }
+        setSuccess(`GST verified! Business: ${gstResult.business_name}. Sending email OTP...`)
       }
 
-      setSuccess('Registration successful. Redirecting...')
+      // Send email OTP (same for buyer and farmer)
+      await sendRegisterOtp(formData)
+      setSuccess((prev) =>
+        formData.role === 'farmer'
+          ? `GST verified! Email OTP sent to ${formData.email}. Please verify.`
+          : `Email OTP sent successfully to ${formData.email}. Please verify.`
+      )
+      setStep('otp')
+      setOtp('')
+    } catch (err) {
+      setError(err.message || 'Action failed.')
+    } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleVerifyRegisterOtp(e) {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      const payload = { ...formData, otp }
+
+      // Attach GST data for farmer/seller
+      if (formData.role === 'farmer' && gstData) {
+        payload.gst_number = gstData.gst_number
+        payload.gst_verified = gstData.gst_verified
+        payload.business_name = gstData.business_name
+      }
+
+      await verifyRegisterOtp(payload)
+
+      setSuccess('Registration successful. Redirecting...')
 
       setTimeout(() => {
         navigate(formData.role === 'buyer' ? '/buyer-login' : '/seller-login')
-      }, 1200)
-    } catch {
-      setError('Something went wrong. Please try again.')
+      }, 1500)
+    } catch (err) {
+      setError(err.message || 'OTP verification failed.')
+    } finally {
       setLoading(false)
     }
   }
@@ -91,6 +124,7 @@ export default function Register() {
             alt="Register"
             className="register-image"
           />
+
           <div className="register-overlay" />
 
           <div className="register-visual-content">
@@ -119,92 +153,159 @@ export default function Register() {
           <div className="register-card">
             <div className="register-top">
               <div className="register-icon">✨</div>
-              <span className="register-small-badge">Create Account</span>
-              <h2>Register</h2>
-              <p>Create your AgroMitra account and continue your journey.</p>
+
+              <span className="register-small-badge">
+                {step === 'register' ? 'Create Account' : 'Email Verification'}
+              </span>
+
+              <h2>
+                {step === 'register' ? 'Register' : 'Email OTP'}
+              </h2>
+
+              <p>
+                {step === 'register'
+                  ? 'Create your AgroMitra account and continue your journey.'
+                  : `Enter the 6 digit OTP sent to ${formData.email}`}
+              </p>
             </div>
 
             {error ? <div className="register-error">{error}</div> : null}
             {success ? <div className="register-success">{success}</div> : null}
 
-            <form onSubmit={handleSubmit} className="register-form">
-              <div className="register-form-group">
-                <label>Full Name</label>
-                <input
-                  type="text"
-                  name="full_name"
-                  placeholder="Enter your full name"
-                  value={formData.full_name}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-
-              <div className="register-grid-two">
+            {step === 'register' ? (
+              <form onSubmit={handleInitialSubmit} className="register-form">
                 <div className="register-form-group">
-                  <label>Email Address</label>
+                  <label>Full Name</label>
                   <input
-                    type="email"
-                    name="email"
-                    placeholder="you@example.com"
-                    value={formData.email}
+                    type="text"
+                    name="full_name"
+                    placeholder="Enter your full name"
+                    value={formData.full_name}
                     onChange={handleChange}
                     required
                   />
                 </div>
 
-                <div className="register-form-group">
-                  <label>Phone Number</label>
-                  <input
-                    type="text"
-                    name="phone"
-                    placeholder="Enter phone number"
-                    value={formData.phone}
-                    onChange={handleChange}
-                  />
-                </div>
-              </div>
-
-              <div className="register-grid-two">
-                <div className="register-form-group">
-                  <label>Password</label>
-                  <div className="register-password-field">
+                <div className="register-grid-two">
+                  <div className="register-form-group">
+                    <label>Email Address</label>
                     <input
-                      type={showPassword ? 'text' : 'password'}
-                      name="password"
-                      placeholder="Create a password"
-                      value={formData.password}
+                      type="email"
+                      name="email"
+                      placeholder="you@example.com"
+                      value={formData.email}
                       onChange={handleChange}
                       required
                     />
-                    <button
-                      type="button"
-                      className="register-password-toggle"
-                      onClick={() => setShowPassword((prev) => !prev)}
-                    >
-                      {showPassword ? 'Hide' : 'Show'}
-                    </button>
+                  </div>
+
+                  <div className="register-form-group">
+                    <label>Phone Number</label>
+                    <input
+                      type="text"
+                      name="phone"
+                      placeholder="Enter phone number"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      required
+                    />
                   </div>
                 </div>
 
-                <div className="register-form-group">
-                  <label>Register As</label>
-                  <select
-                    name="role"
-                    value={formData.role}
-                    onChange={handleChange}
-                    required
-                  >
-                    <option value="buyer">Buyer</option>
-                    <option value="farmer">Seller</option>
-                  </select>
-                </div>
-              </div>
+                <div className="register-grid-two">
+                  <div className="register-form-group">
+                    <label>Password</label>
+                    <div className="register-password-field">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        name="password"
+                        placeholder="Create a password"
+                        value={formData.password}
+                        onChange={handleChange}
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="register-password-toggle"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                      >
+                        {showPassword ? 'Hide' : 'Show'}
+                      </button>
+                    </div>
+                  </div>
 
-              <button type="submit" className="register-btn-main" disabled={loading}>
-                {loading ? 'Creating account...' : 'Create Account'}
-              </button>
-            </form>
+                  <div className="register-form-group">
+                    <label>Register As</label>
+                    <select
+                      name="role"
+                      value={formData.role}
+                      onChange={handleChange}
+                      required
+                    >
+                      <option value="buyer">Buyer</option>
+                      <option value="farmer">Seller/Farmer</option>
+                    </select>
+                  </div>
+                </div>
+
+                {formData.role === 'farmer' && (
+                  <div className="register-form-group">
+                    <label>GST Number (GSTIN)</label>
+                    <input
+                      type="text"
+                      name="gst_number"
+                      placeholder="e.g. 22AAAAA0000A1Z5"
+                      value={formData.gst_number}
+                      maxLength="15"
+                      onChange={(e) => {
+                        const val = e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '')
+                        handleChange({ target: { name: 'gst_number', value: val } })
+                      }}
+                      required
+                    />
+                    <small style={{ color: '#64748b', marginTop: '4px', display: 'block' }}>
+                      15 character GSTIN format required for seller verification
+                    </small>
+                  </div>
+                )}
+
+                <button type="submit" className="register-btn-main" disabled={loading}>
+                  {loading ? 'Processing...' : 'Create Account'}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleVerifyRegisterOtp} className="register-form">
+                <div className="register-form-group">
+                  <label>Enter Email OTP</label>
+                  <input
+                    className="register-otp-input"
+                    type="text"
+                    placeholder="Enter 6 digit OTP"
+                    value={otp}
+                    maxLength="6"
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                    required
+                  />
+                </div>
+
+                <button className="register-btn-main" disabled={loading}>
+                  {loading ? 'Verifying...' : 'Verify Email OTP'}
+                </button>
+
+                <button
+                  type="button"
+                  className="register-btn-secondary"
+                  onClick={() => {
+                    setStep('register')
+                    setOtp('')
+                    setError('')
+                    setSuccess('')
+                  }}
+                >
+                  Back to Register
+                </button>
+              </form>
+            )}
 
             <div className="register-bottom">
               <p>
