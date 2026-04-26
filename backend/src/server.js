@@ -1,16 +1,27 @@
 import dotenv from "dotenv";
+import axios from "axios";
 import app from "./app.js";
 import chatRoute from "./routes/chat.js";
 
-// 🔐 Load env variables
+// 🔐 Load env
 dotenv.config();
 
+const app = express();
+
+// ✅ Middleware
+app.use(cors());
+app.use(express.json());
+
+// ✅ Test route
 // ✅ Test route (important for debugging)
 app.get("/", (req, res) => {
   res.send("🚀 AgroMitra AI Backend Running");
 });
 
-// ✅ Chat route
+
+// =====================================================
+// ✅ PRIMARY CHAT ROUTE (MODULAR - BEST PRACTICE)
+// =====================================================
 app.use("/api/chat", chatRoute);
 
 // =====================================================
@@ -76,13 +87,19 @@ app.use((req, res) => {
   res.status(404).json({ error: "Route not found" });
 });
 
-// ❌ Global error handler (important)
+
+// =====================================================
+// ❌ GLOBAL ERROR HANDLER
+// =====================================================
 app.use((err, req, res, next) => {
   console.error("❌ Server Error:", err.stack);
   res.status(500).json({ error: "Internal Server Error" });
 });
 
-// 🚀 Start server
+
+// =====================================================
+// 🚀 START SERVER
+// =====================================================
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {

@@ -172,6 +172,7 @@ export default function Chatbot() {
     </div>
   );
 
+  // UI Structure
   return (
     <>
       {/* 🌿 FLOAT BUTTON */}
@@ -218,6 +219,7 @@ export default function Chatbot() {
       {/* 💬 CHATBOX UI (Glassmorphism & WhatsApp Style) */}
       {open && (
         <div
+          key={i}
           style={{
             position: "fixed",
             bottom: 100,
@@ -300,6 +302,8 @@ export default function Chatbot() {
               <option value="hi">हिंदी</option>
             </select>
           </div>
+        </div>
+      ))}
 
           {/* CHAT AREA */}
           <div
@@ -473,4 +477,4 @@ export default function Chatbot() {
       )}
     </>
   );
-}
+}   
