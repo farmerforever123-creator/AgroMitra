@@ -5,6 +5,7 @@ import {
   verifyRegisterOtp,
   verifyGst,
 } from '../services/registerOtpService'
+import { validateEmail, normalizeEmail } from '../utils/authUtils'
 import '../components/landing.css'
 
 const GST_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/
@@ -31,6 +32,9 @@ export default function Register() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
+  // UI Feedback for email validation
+  const isEmailValid = formData.email ? validateEmail(formData.email) : true;
+
   function handleChange(event) {
     const { name, value } = event.target
     setFormData((prev) => ({
@@ -41,12 +45,20 @@ export default function Register() {
 
   async function handleInitialSubmit(e) {
     e.preventDefault()
+    
+    // 1. Normalize and Validate Email
+    const normalizedEmail = normalizeEmail(formData.email);
+    if (!validateEmail(normalizedEmail)) {
+      setError('Please enter a valid and secure email address.');
+      return;
+    }
+
     setLoading(true)
     setError('')
     setSuccess('')
 
     try {
-      if (formData.role === 'farmer') {
+      if (formData.role === 'seller') {
         // Validate GST format on frontend
         if (!GST_REGEX.test(formData.gst_number)) {
           throw new Error('Invalid GST number format. Must be 15 characters in valid GSTIN format (e.g., 22AAAAA0000A1Z5).')
@@ -59,22 +71,21 @@ export default function Register() {
           throw new Error(gstResult.message || 'GST verification failed.')
         }
 
-        // Save GST verification data for later use during OTP verify
         setGstData({
           gst_number: formData.gst_number,
           gst_verified: gstResult.gst_verified,
           business_name: gstResult.business_name,
         })
-
-        setSuccess(`GST verified! Business: ${gstResult.business_name}. Sending email OTP...`)
       }
 
-      // Send email OTP (same for buyer and farmer)
-      await sendRegisterOtp(formData)
-      setSuccess((prev) =>
-        formData.role === 'farmer'
-          ? `GST verified! Email OTP sent to ${formData.email}. Please verify.`
-          : `Email OTP sent successfully to ${formData.email}. Please verify.`
+      // Send email OTP with normalized email
+      const payload = { ...formData, email: normalizedEmail };
+      await sendRegisterOtp(payload)
+      
+      setSuccess(
+        formData.role === 'seller'
+          ? `GST verified! Email OTP sent to ${normalizedEmail}. Please verify.`
+          : `Email OTP sent successfully to ${normalizedEmail}. Please verify.`
       )
       setStep('otp')
       setOtp('')
@@ -94,8 +105,8 @@ export default function Register() {
     try {
       const payload = { ...formData, otp }
 
-      // Attach GST data for farmer/seller
-      if (formData.role === 'farmer' && gstData) {
+      // Attach GST data for seller
+      if (formData.role === 'seller' && gstData) {
         payload.gst_number = gstData.gst_number
         payload.gst_verified = gstData.gst_verified
         payload.business_name = gstData.business_name
@@ -243,12 +254,12 @@ export default function Register() {
                       required
                     >
                       <option value="buyer">Buyer</option>
-                      <option value="farmer">Seller/Farmer</option>
+                      <option value="seller">Seller/Farmer</option>
                     </select>
                   </div>
                 </div>
 
-                {formData.role === 'farmer' && (
+                {formData.role === 'seller' && (
                   <div className="register-form-group">
                     <label>GST Number (GSTIN)</label>
                     <input

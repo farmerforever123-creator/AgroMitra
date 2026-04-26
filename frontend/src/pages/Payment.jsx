@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../lib/supabase'
+import axios from 'axios'
 import '../components/landing.css'
 
 // Fixed merchant UPI ID — stored in env for easy config
@@ -43,10 +44,41 @@ export default function Payment() {
   const [processing, setProcessing]     = useState(false)
 
   useEffect(() => {
-    const raw = sessionStorage.getItem('agromitra_order')
-    if (!raw) { navigate('/checkout'); return }
-    setOrderData(JSON.parse(raw))
+    fetchOrderData()
   }, [navigate])
+
+  async function fetchOrderData() {
+    // 1. Try sessionStorage first (for address and immediate context)
+    const raw = sessionStorage.getItem('agromitra_order')
+    let baseOrder = raw ? JSON.parse(raw) : null
+
+    // 2. Always verify/fetch from Supabase cart table
+    const { data: userData } = await supabase.auth.getUser()
+    const user = userData?.user
+    if (!user) { navigate('/buyer-login'); return }
+
+    const { data: cartItems, error } = await supabase
+      .from('cart')
+      .select('*')
+      .eq('user_id', user.id)
+
+    if (error || !cartItems || cartItems.length === 0) {
+      if (!baseOrder) { navigate('/cart'); return }
+    } else {
+      // Re-calculate totals from DB data to prevent tampering
+      const subtotal = cartItems.reduce((sum, item) => sum + Number(item.price || 0) * item.quantity, 0)
+      const deliveryFee = 49
+      const grandTotal = subtotal + deliveryFee
+
+      setOrderData({
+        ...baseOrder,
+        items: cartItems,
+        subtotal,
+        deliveryFee,
+        grandTotal
+      })
+    }
+  }
 
   function handleMethodChange(method) {
     setPaymentMethod(method)
@@ -76,64 +108,78 @@ export default function Payment() {
     }
   }
 
-  // ── ORDER CREATION — unchanged logic ────────────────────────────────
+  // ── ORDER CREATION — FIXED logic for Payment Status ────────────────
   async function createOrder(paymentStatus) {
     setProcessing(true)
     try {
-      const { data: userData } = await supabase.auth.getUser()
-      const currentUser = userData?.user
-      if (!currentUser) { navigate('/buyer-login'); return }
-
-      // Prevent duplicate order on double-click / page reload
-      const existing = sessionStorage.getItem('agromitra_placed_order_id')
-      if (existing) {
-        sessionStorage.removeItem('agromitra_order')
-        sessionStorage.removeItem('agromitra_placed_order_id')
-        navigate('/payment-success')
-        return
+      const token = localStorage.getItem('token')
+      if (!token) {
+        alert("Session expired. Please login again.");
+        navigate('/buyer-login');
+        return;
       }
 
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          buyer_id:       currentUser.id,
-          address_id:     orderData.addressId,
-          total_amount:   orderData.grandTotal,
-          status:         'placed',
-          payment_method: paymentMethod,
-          payment_status: paymentStatus,
-        })
-        .select()
-        .single()
-      if (orderError) throw orderError
+      const orderData = JSON.parse(sessionStorage.getItem('agromitra_order'))
+      
+      if (!orderData) throw new Error('Order data not found')
 
-      const orderItems = orderData.items.map((item) => ({
-        order_id:     order.id,
-        product_id:   item.productId,
-        product_name: item.productName,
-        quantity:     item.quantity,
-        price:        item.price,
-      }))
-      const { error: itemsError } = await supabase.from('order_items').insert(orderItems)
-      if (itemsError) throw itemsError
+      // Map payment status to database-approved values (LOWERCASE required by DB)
+      const normalizedStatus = paymentStatus === 'cod_pending' || paymentStatus === 'pending' || paymentStatus === 'PENDING'
+        ? 'pending' 
+        : paymentStatus.toLowerCase();
 
-      // Clear cart
-      const cartIds = orderData.items.map((i) => i.cartId)
-      await supabase.from('cart_items').delete().in('id', cartIds)
-      window.dispatchEvent(new Event('cartUpdated'))
+      const response = await axios.post("http://localhost:5000/api/orders", {
+        address_id:     orderData.addressId,
+        total_amount:   orderData.grandTotal,
+        payment_method: paymentMethod.toLowerCase(),
+        payment_status: normalizedStatus,
+        items:          orderData.items
+      }, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-      sessionStorage.setItem('agromitra_placed_order_id', order.id)
+      console.log("ORDER RESPONSE:", response.data);
+
+      const createdOrder = response.data.order || response.data.data || response.data;
+      const createdOrderId = createdOrder?.id;
+
+      console.log("CREATED ORDER ID:", createdOrderId);
+
+      if (!createdOrderId) {
+        alert("Order created but order ID not found in response");
+        return;
+      }
+
+      // Save IDs for persistence
+      localStorage.setItem('orderId', createdOrderId)
+      localStorage.setItem('lastOrderId', createdOrderId)
+      localStorage.setItem('lastOrderAmount', createdOrder.total_amount || createdOrder.totalAmount || orderData.grandTotal)
+      
       sessionStorage.removeItem('agromitra_order')
 
       navigate('/payment-success', {
         state: {
-          orderId: order.id,
-          amount:  orderData.grandTotal,
-          method:  paymentMethod,
+          orderId: createdOrderId,
+          amount:  createdOrder.total_amount || createdOrder.totalAmount || orderData.grandTotal,
+          method:  paymentMethod.toLowerCase(),
+          paymentStatus: normalizedStatus,
         },
       })
     } catch (err) {
-      alert(err.message || 'Failed to place order. Please try again.')
+      console.error("Place Order Error:", err);
+      
+      // Auto-logout on 401
+      if (err.response?.status === 401) {
+        localStorage.clear();
+        sessionStorage.clear();
+        alert("Your session has expired. Please login again.");
+        navigate('/buyer-login');
+        return;
+      }
+
+      alert(err.response?.data?.message || err.message || 'Failed to place order. Please try again.')
     } finally {
       setProcessing(false)
     }

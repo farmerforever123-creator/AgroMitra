@@ -1,8 +1,9 @@
+import { useEffect } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
 import Hero from '../components/Hero'
 import Features from '../components/Features'
 import Reviews from '../components/Reviews'
 import '../components/landing.css'
-import { Link } from 'react-router-dom'
 
 function FeatureRow() {
   return (

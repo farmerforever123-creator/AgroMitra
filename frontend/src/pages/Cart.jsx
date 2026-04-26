@@ -37,23 +37,16 @@ export default function Cart() {
     }
 
     const { data, error } = await supabase
-      .from('cart_items')
+      .from('cart')
       .select(`
         id,
         quantity,
-        products (
-          id,
-          name,
-          price,
-          unit,
-          description,
-          product_images (
-            image_url,
-            is_primary
-          )
-        )
+        product_id,
+        product_name,
+        price,
+        image
       `)
-      .eq('buyer_id', currentUser.id)
+      .eq('user_id', currentUser.id)
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -71,7 +64,7 @@ export default function Cart() {
     if (newQty < 1) return
 
     const { error } = await supabase
-      .from('cart_items')
+      .from('cart')
       .update({ quantity: newQty })
       .eq('id', cartId)
 
@@ -85,7 +78,7 @@ export default function Cart() {
 
   async function removeItem(cartId) {
     const { error } = await supabase
-      .from('cart_items')
+      .from('cart')
       .delete()
       .eq('id', cartId)
 
@@ -99,7 +92,7 @@ export default function Cart() {
 
   const totalAmount = useMemo(() => {
     return items.reduce((sum, item) => {
-      return sum + Number(item.products?.price || 0) * item.quantity
+      return sum + Number(item.price || 0) * item.quantity
     }, 0)
   }, [items])
 
@@ -128,26 +121,20 @@ export default function Cart() {
           <div className="cart-layout">
             <div className="cart-items-list">
               {items.map((item) => {
-                const product = item.products
-                const image =
-                  product?.product_images?.find((img) => img.is_primary)
-                    ?.image_url ||
-                  product?.product_images?.[0]?.image_url ||
-                  'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=800&q=80'
-
-                const subtotal = Number(product?.price || 0) * item.quantity
+                const image = item.image || 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=800&q=80'
+                const subtotal = Number(item.price || 0) * item.quantity
 
                 return (
                   <div className="cart-item-card" key={item.id}>
-                    <img src={image} alt={product?.name} />
+                    <img src={image} alt={item.product_name} />
 
                     <div className="cart-item-info">
-                      <h3>{product?.name}</h3>
-                      <p>{product?.description || 'Fresh agricultural product'}</p>
+                      <h3>{item.product_name}</h3>
+                      <p>{item.description || 'Fresh agricultural product'}</p>
 
                       <div className="cart-price-row">
-                        <strong>₹{product?.price}</strong>
-                        <span>/ {product?.unit || 'unit'}</span>
+                        <strong>₹{item.price}</strong>
+                        <span>/ unit</span>
                       </div>
 
                       <div className="cart-quantity-row">

@@ -29,20 +29,16 @@ export default function Checkout() {
 
     // Load cart
     const { data: cartData, error: cartError } = await supabase
-      .from('cart_items')
+      .from('cart')
       .select(`
         id,
         quantity,
-        products (
-          id,
-          name,
-          price,
-          unit,
-          stock_quantity,
-          product_images ( image_url, is_primary )
-        )
+        product_id,
+        product_name,
+        price,
+        image
       `)
-      .eq('buyer_id', currentUser.id)
+      .eq('user_id', currentUser.id)
       .order('created_at', { ascending: false })
 
     if (cartError) {
@@ -83,18 +79,14 @@ export default function Checkout() {
   }
 
   const subtotal = items.reduce(
-    (sum, item) => sum + Number(item.products?.price || 0) * item.quantity,
+    (sum, item) => sum + Number(item.price || 0) * item.quantity,
     0
   )
   const deliveryFee = subtotal > 0 ? 49 : 0
   const grandTotal = subtotal + deliveryFee
 
-  // Stock warnings
-  const stockWarnings = items.filter(
-    (item) =>
-      item.products?.stock_quantity != null &&
-      item.quantity > item.products.stock_quantity
-  )
+  // Flattened cart usually doesn't have stock info, we proceed with cart quantity
+  const stockWarnings = []
 
   function handleContinue() {
     if (!address) {
@@ -111,9 +103,9 @@ export default function Checkout() {
     const orderData = {
       items: items.map((i) => ({
         cartId: i.id,
-        productId: i.products?.id,
-        productName: i.products?.name,
-        price: Number(i.products?.price || 0),
+        productId: i.product_id,
+        productName: i.product_name,
+        price: Number(i.price || 0),
         quantity: i.quantity,
       })),
       addressId: address.id,
@@ -151,34 +143,19 @@ export default function Checkout() {
               <h2 className="checkout-card-title">🛒 Order Summary</h2>
               <div className="checkout-items">
                 {items.map((item) => {
-                  const product = item.products
-                  const image =
-                    product?.product_images?.find((i) => i.is_primary)?.image_url ||
-                    product?.product_images?.[0]?.image_url ||
-                    'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=400&q=80'
-                  const isOverStock =
-                    product?.stock_quantity != null &&
-                    item.quantity > product.stock_quantity
+                  const image = item.image || 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=400&q=80'
 
                   return (
-                    <div
-                      className={`checkout-item${isOverStock ? ' checkout-item--warn' : ''}`}
-                      key={item.id}
-                    >
-                      <img src={image} alt={product?.name} className="checkout-item-img" />
+                    <div className="checkout-item" key={item.id}>
+                      <img src={image} alt={item.product_name} className="checkout-item-img" />
                       <div className="checkout-item-info">
-                        <strong>{product?.name}</strong>
+                        <strong>{item.product_name}</strong>
                         <span>
-                          ₹{product?.price} / {product?.unit || 'unit'} × {item.quantity}
+                          ₹{item.price} × {item.quantity}
                         </span>
-                        {isOverStock && (
-                          <span className="checkout-stock-warn">
-                            ⚠ Only {product.stock_quantity} available
-                          </span>
-                        )}
                       </div>
                       <div className="checkout-item-subtotal">
-                        ₹{(Number(product?.price || 0) * item.quantity).toFixed(0)}
+                        ₹{(Number(item.price || 0) * item.quantity).toFixed(0)}
                       </div>
                     </div>
                   )

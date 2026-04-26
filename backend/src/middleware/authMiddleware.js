@@ -1,6 +1,6 @@
-import jwt from "jsonwebtoken";
+import { supabase } from "../config/supabase.js";
 
-export const protect = (req, res, next) => {
+export const protect = async (req, res, next) => {
   let token;
 
   if (req.headers.authorization?.startsWith("Bearer")) {
@@ -8,14 +8,19 @@ export const protect = (req, res, next) => {
   }
 
   if (!token) {
-    return res.status(401).json({ message: "Not authorized" });
+    return res.status(401).json({ message: "Not authorized. No token provided." });
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // attach user data
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+
+    if (error || !user) {
+      return res.status(401).json({ message: "Token invalid or expired" });
+    }
+
+    req.user = user; // attach supabase user data
     next();
   } catch (error) {
-    res.status(401).json({ message: "Token invalid" });
+    res.status(401).json({ message: "Authentication failed" });
   }
 };

@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { validateEmail, normalizeEmail } from '../utils/authUtils'
 import '../components/landing.css'
 
 export default function BuyerLogin() {
@@ -12,14 +13,26 @@ export default function BuyerLogin() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  // Check for email validity for UI feedback
+  const isEmailValid = email ? validateEmail(email) : true;
+
   async function handleSubmit(event) {
     event.preventDefault()
+    
+    // 1. Normalize and Validate Email
+    const normalizedEmail = normalizeEmail(email);
+    if (!validateEmail(normalizedEmail)) {
+      setError('Please enter a valid and secure email address.');
+      return;
+    }
+
     setLoading(true)
     setError('')
 
     try {
+      // 2. Authenticate with Supabase
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
+        email: normalizedEmail,
         password,
       });
 
@@ -27,31 +40,44 @@ export default function BuyerLogin() {
 
       const user = authData.user;
 
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
+      // 3. Fetch role from 'users' table as per requirement
+      const { data: userData, error: userError } = await supabase
+        .from('users')
         .select('role')
         .eq('id', user.id)
         .single();
 
-      if (profileError || !profile) {
-        throw new Error('Profile not found.');
+      let userRole;
+      if (userError || !userData) {
+        // Fallback to 'profiles' if 'users' doesn't exist yet, but prioritize 'users'
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+        if (!profile) throw new Error('User role not found.');
+        userRole = profile.role;
+      } else {
+        userRole = userData.role;
       }
 
-      if (profile.role !== 'buyer') {
+      // 4. Role Enforcement
+      if (userRole !== 'buyer') {
         await supabase.auth.signOut();
-        throw new Error('This account is not registered as a buyer.');
+        throw new Error('This account is registered as a seller. Please use the Seller Login page.');
       }
 
-      // Log the login using the backend API
+      // 5. Store role, user, and token in localStorage
+      localStorage.setItem('role', userRole);
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('token', authData.session.access_token); // Store JWT for backend
+
+      // 6. Log the login (optional backend call)
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
       await fetch(`${API_BASE_URL}/auth/login-log`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: user.id, email: user.email, role: profile.role })
+        body: JSON.stringify({ user_id: user.id, email: user.email, role: userRole })
       }).catch(console.error);
 
       window.dispatchEvent(new Event('authChange'));
-      navigate('/products');
+      navigate('/'); // Redirect to Buyer Home
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.');
     } finally {

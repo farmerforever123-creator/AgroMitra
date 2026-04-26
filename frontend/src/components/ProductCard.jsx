@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import './landing.css'
 
 export default function ProductCard({ product }) {
   const [adding, setAdding] = useState(false)
+  const navigate = useNavigate()
 
   const image =
     product?.product_images?.find((img) => img.is_primary)?.image_url ||
@@ -11,7 +13,8 @@ export default function ProductCard({ product }) {
     product?.image_url ||
     'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=500&q=80'
 
-  async function handleAddToCart() {
+  async function handleAddToCart(e) {
+    e.stopPropagation() // Prevent navigating when clicking Add to Cart
     setAdding(true)
 
     try {
@@ -24,22 +27,25 @@ export default function ProductCard({ product }) {
       }
 
       const { data: existingItem } = await supabase
-        .from('cart_items')
+        .from('cart')
         .select('id, quantity')
-        .eq('buyer_id', user.id)
+        .eq('user_id', user.id)
         .eq('product_id', product.id)
         .maybeSingle()
 
       if (existingItem) {
         await supabase
-          .from('cart_items')
+          .from('cart')
           .update({ quantity: existingItem.quantity + 1 })
           .eq('id', existingItem.id)
       } else {
-        await supabase.from('cart_items').insert({
-          buyer_id: user.id,
+        await supabase.from('cart').insert({
+          user_id: user.id,
           product_id: product.id,
+          product_name: product.name,
+          price: product.price,
           quantity: 1,
+          image: image,
         })
       }
 
@@ -52,7 +58,7 @@ export default function ProductCard({ product }) {
   }
 
   return (
-    <div className="shop-card">
+    <div className="shop-card" onClick={() => navigate(`/product/${product.id}`)} style={{ cursor: 'pointer' }}>
       <div className="shop-img-box">
         <img src={image} alt={product?.name || 'Product'} />
 

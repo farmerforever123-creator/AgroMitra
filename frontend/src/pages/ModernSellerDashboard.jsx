@@ -1,0 +1,286 @@
+import React, { useState, useEffect, useRef } from "react";
+import { supabase } from "../lib/supabase";
+import "./ModernSellerDashboard.css";
+
+const ModernSellerDashboard = () => {
+  const [activeTab, setActiveTab] = useState("addProduct");
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState({ type: "", message: "" });
+
+  // Tab 1: Add Product State
+  const [productData, setProductData] = useState({ name: "", price: "", description: "" });
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const fileInputRef = useRef(null);
+
+  // Tab 2: Product List State
+  const [products, setProducts] = useState([]);
+
+  // Tab 4: Seller Account State
+  const [accountData, setAccountData] = useState({
+    seller_name: "", email: "", phone: "", address: "",
+    shop_name: "", bank_account_number: "", ifsc_code: "", upi_id: ""
+  });
+
+  useEffect(() => {
+    if (activeTab === "productList") fetchProducts();
+    if (activeTab === "sellerAccount") fetchAccountDetails();
+  }, [activeTab]);
+
+  // --- TAB 1: ADD PRODUCT LOGIC ---
+  const handleProductSubmit = async (e) => {
+    e.preventDefault();
+    if (!productData.name || !productData.price || !imageFile) {
+      setStatus({ type: "error", message: "All fields and an image are required." });
+      return;
+    }
+    if (imageFile.size > 2 * 1024 * 1024) {
+      setStatus({ type: "error", message: "Image size must be less than 2MB." });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setStatus({ type: "", message: "" });
+
+      // 1. Upload to storage
+      const fileName = `${Date.now()}-${imageFile.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from("seller_product")
+        .upload(fileName, imageFile);
+      if (uploadError) throw uploadError;
+
+      // 2. Get Public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from("seller_product")
+        .getPublicUrl(fileName);
+
+      // 3. Direct Supabase Insert (Recommended Fix for 401)
+      const { error: dbError } = await supabase
+        .from("seller_product")
+        .insert([
+          {
+            name: productData.name,
+            price: parseFloat(productData.price),
+            description: productData.description,
+            image: publicUrl,
+          },
+        ]);
+
+      if (dbError) throw dbError;
+
+      setStatus({ type: "success", message: "Product added successfully! 🌱" });
+      setProductData({ name: "", price: "", description: "" });
+      setImageFile(null);
+      setImagePreview(null);
+      fetchProducts();
+    } catch (err) {
+      setStatus({ type: "error", message: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- TAB 2: PRODUCT LIST LOGIC ---
+  const fetchProducts = async () => {
+    // Note: Removed created_at ordering to avoid 400 error if column is missing
+    const { data, error } = await supabase.from("seller_product").select("*");
+    if (!error) setProducts(data);
+    else console.error("Fetch Error:", error);
+  };
+
+  const deleteProduct = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this product?")) return;
+    const { error } = await supabase.from("seller_product").delete().eq("id", id);
+    if (!error) fetchProducts();
+    else alert("Delete failed: " + error.message);
+  };
+
+  // --- TAB 4: SELLER ACCOUNT LOGIC ---
+  const fetchAccountDetails = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data, error } = await supabase.from("seller_account").select("*").eq("id", user.id).single();
+    if (data) setAccountData(data);
+    else setAccountData(prev => ({ ...prev, id: user.id, email: user.email }));
+  };
+
+  const handleAccountUpdate = async (e) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      const { error } = await supabase.from("seller_account").upsert(accountData);
+      if (error) throw error;
+      setStatus({ type: "success", message: "Account updated successfully!" });
+    } catch (err) {
+      setStatus({ type: "error", message: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    localStorage.clear();
+    window.dispatchEvent(new Event("authChange"));
+    window.location.href = "/seller-login";
+  };
+
+  return (
+    <div className="msd-root">
+      {/* Sidebar Navigation */}
+      <aside className="msd-sidebar">
+        <div className="msd-logo">
+          <span className="msd-logo-icon">🌱</span>
+          <span className="msd-logo-text">AgroMitra</span>
+        </div>
+        <nav className="msd-nav">
+          <button className={`msd-nav-item ${activeTab === "addProduct" ? "active" : ""}`} onClick={() => setActiveTab("addProduct")}>
+            ➕ <span>Add Product</span>
+          </button>
+          <button className={`msd-nav-item ${activeTab === "productList" ? "active" : ""}`} onClick={() => setActiveTab("productList")}>
+            📦 <span>Product List</span>
+          </button>
+          <button className={`msd-nav-item ${activeTab === "orderList" ? "active" : ""}`} onClick={() => setActiveTab("orderList")}>
+            📋 <span>Order List</span>
+          </button>
+          <button className={`msd-nav-item ${activeTab === "sellerAccount" ? "active" : ""}`} onClick={() => setActiveTab("sellerAccount")}>
+            👤 <span>Seller Account</span>
+          </button>
+          
+          <button className="msd-nav-item logout" onClick={handleLogout} style={{ marginTop: 'auto', color: '#ef4444' }}>
+            🚪 <span>Logout</span>
+          </button>
+        </nav>
+      </aside>
+
+      {/* Main Content Area */}
+      <main className="msd-main">
+        <header className="msd-content-header">
+          <h1>{activeTab === "addProduct" ? "Add New Product" : 
+               activeTab === "productList" ? "My Products" : 
+               activeTab === "orderList" ? "Customer Orders" : "Account Settings"}</h1>
+        </header>
+
+        {status.message && <div className={`msd-status ${status.type}`}>{status.message}</div>}
+
+        {/* Tab Content */}
+        <div className="msd-content">
+          
+          {/* Section: Add Product */}
+          {activeTab === "addProduct" && (
+            <div className="msd-card">
+              <form className="msd-form" onSubmit={handleProductSubmit}>
+                <div className="msd-field">
+                  <label>Product Name *</label>
+                  <input type="text" placeholder="e.g. Premium Wheat" value={productData.name} onChange={e => setProductData({...productData, name: e.target.value})} required />
+                </div>
+                <div className="msd-field">
+                  <label>Price (₹) *</label>
+                  <input type="number" placeholder="0.00" value={productData.price} onChange={e => setProductData({...productData, price: e.target.value})} required />
+                </div>
+                <div className="msd-field">
+                  <label>Description *</label>
+                  <textarea rows="4" placeholder="Brief details about origin, quality..." value={productData.description} onChange={e => setProductData({...productData, description: e.target.value})} required />
+                </div>
+                <div className="msd-field">
+                  <label>Product Image * (Max 2MB)</label>
+                  <div className="msd-upload-zone" onClick={() => fileInputRef.current.click()}>
+                    <input type="file" hidden ref={fileInputRef} accept="image/*" onChange={e => {
+                      const file = e.target.files[0];
+                      if (file) { setImageFile(file); setImagePreview(URL.createObjectURL(file)); }
+                    }} />
+                    {imagePreview ? <img src={imagePreview} className="msd-preview-img" alt="Preview" /> : <p>Click to upload image</p>}
+                  </div>
+                </div>
+                <button className="msd-btn-primary" type="submit" disabled={loading}>
+                  {loading ? <div className="spinner"></div> : "Add Product"}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* Section: Product List */}
+          {activeTab === "productList" && (
+            <div className="msd-product-grid">
+              {products.map(p => (
+                <div key={p.id} className="msd-product-card">
+                  <img 
+                    src={p.image || p.image_url} 
+                    className="msd-product-img" 
+                    alt={p.name} 
+                    style={{ width: "100%", height: "200px", objectFit: "cover" }}
+                    onError={(e) => { e.target.src = "https://via.placeholder.com/200?text=AgroMitra"; }}
+                  />
+                  <div className="msd-product-info">
+                    <h3>{p.name}</h3>
+                    <p className="msd-product-price">₹{p.price}</p>
+                    <p style={{fontSize: '14px', color: '#64748b'}}>{p.description}</p>
+                    <button className="msd-btn-danger" onClick={() => deleteProduct(p.id)} style={{marginTop: '12px'}}>Delete</button>
+                  </div>
+                </div>
+              ))}
+              {products.length === 0 && <p>No products found.</p>}
+            </div>
+          )}
+
+          {/* Section: Order List */}
+          {activeTab === "orderList" && (
+            <div className="msd-card msd-table-container">
+              <table className="msd-table">
+                <thead>
+                  <tr>
+                    <th>Order ID</th>
+                    <th>Product</th>
+                    <th>Buyer</th>
+                    <th>Qty</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dummyOrders.map(o => (
+                    <tr key={o.id}>
+                      <td>{o.id}</td>
+                      <td>{o.product}</td>
+                      <td>{o.buyer}</td>
+                      <td>{o.qty}</td>
+                      <td><span className={`msd-badge ${o.status.toLowerCase()}`}>{o.status}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Section: Seller Account */}
+          {activeTab === "sellerAccount" && (
+            <div className="msd-card">
+              <form className="msd-form" onSubmit={handleAccountUpdate}>
+                <div className="msd-form-row">
+                  <div className="msd-field"><label>Seller Name</label><input type="text" value={accountData.seller_name} onChange={e => setAccountData({...accountData, seller_name: e.target.value})} /></div>
+                  <div className="msd-field"><label>Email</label><input type="email" value={accountData.email} readOnly /></div>
+                </div>
+                <div className="msd-form-row">
+                  <div className="msd-field"><label>Phone</label><input type="text" value={accountData.phone} onChange={e => setAccountData({...accountData, phone: e.target.value})} /></div>
+                  <div className="msd-field"><label>Shop Name</label><input type="text" value={accountData.shop_name} onChange={e => setAccountData({...accountData, shop_name: e.target.value})} /></div>
+                </div>
+                <div className="msd-field"><label>Address</label><textarea rows="3" value={accountData.address} onChange={e => setAccountData({...accountData, address: e.target.value})} /></div>
+                <div className="msd-form-row">
+                  <div className="msd-field"><label>Bank Account Number</label><input type="text" value={accountData.bank_account_number} onChange={e => setAccountData({...accountData, bank_account_number: e.target.value})} /></div>
+                  <div className="msd-field"><label>IFSC Code</label><input type="text" value={accountData.ifsc_code} onChange={e => setAccountData({...accountData, ifsc_code: e.target.value})} /></div>
+                </div>
+                <div className="msd-field"><label>UPI ID</label><input type="text" value={accountData.upi_id} onChange={e => setAccountData({...accountData, upi_id: e.target.value})} /></div>
+                <button className="msd-btn-primary" type="submit" disabled={loading}>
+                  {loading ? <div className="spinner"></div> : "Update Account"}
+                </button>
+              </form>
+            </div>
+          )}
+
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default ModernSellerDashboard;

@@ -1,21 +1,24 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import axios from 'axios'
 import '../components/landing.css'
 
 const STATUS_LABELS = {
   placed:     { label: 'Placed',      cls: 'status--placed' },
+  confirmed:  { label: 'Confirmed',   cls: 'status--paid' },
   processing: { label: 'Processing',  cls: 'status--processing' },
   shipped:    { label: 'Shipped',     cls: 'status--shipped' },
   delivered:  { label: 'Delivered',   cls: 'status--delivered' },
   cancelled:  { label: 'Cancelled',   cls: 'status--cancelled' },
 }
 
+// Payment Labels mapping – handles database-normalized values
 const PAYMENT_LABELS = {
   pending:     { label: 'Payment Pending', cls: 'status--pending' },
   paid:        { label: 'Paid',            cls: 'status--paid' },
-  cod_pending: { label: 'COD',             cls: 'status--cod' },
   failed:      { label: 'Failed',          cls: 'status--failed' },
+  cod_pending: { label: 'COD Pending',     cls: 'status--cod' },
 }
 
 /** Safely shorten any order ID (UUID string, integer, or undefined) */
@@ -44,35 +47,59 @@ export default function MyOrders() {
   useEffect(() => { init() }, [])
 
   async function init() {
+    // 1. Get current user
     const { data: userData } = await supabase.auth.getUser()
     const u = userData?.user
+    console.log("CURRENT USER:", u)
     if (!u) { navigate('/buyer-login'); return }
 
-    const { data, error } = await supabase
+    const token = localStorage.getItem('token')
+
+    // 2. Try backend API first (bypasses RLS)
+    try {
+      const res = await axios.get('http://localhost:5000/api/orders', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      console.log("FETCHED ORDERS (API):", res.data)
+
+      const fetchedOrders = res.data?.orders || res.data || []
+      if (fetchedOrders.length > 0) {
+        setOrders(fetchedOrders)
+        setLoading(false)
+        return
+      }
+    } catch (apiErr) {
+      console.error("API fetch failed, trying Supabase direct:", apiErr.message)
+    }
+
+    // 3. Fallback: Direct Supabase query
+    let { data, error: queryError } = await supabase
       .from('orders')
-      .select(`
-        id,
-        created_at,
-        total_amount,
-        status,
-        payment_method,
-        payment_status,
-        addresses ( full_name, address_line1, city, state, pincode ),
-        order_items (
-          id,
-          product_name,
-          quantity,
-          price
-        )
-      `)
-      .eq('buyer_id', u.id)
+      .select('*, order_items(*)')
+      .or(`user_id.eq.${u.id},buyer_id.eq.${u.id}`)
       .order('created_at', { ascending: false })
 
-    if (error) {
-      setError(error.message)
+    console.log("FETCHED ORDERS (Supabase):", data)
+    console.log("ORDER ERROR:", queryError)
+
+    // 4. If join fails (order_items relation issue), try simple query
+    if (queryError) {
+      console.warn("Retrying without order_items join...")
+      const { data: simpleData, error: simpleError } = await supabase
+        .from('orders')
+        .select('*')
+        .or(`user_id.eq.${u.id},buyer_id.eq.${u.id}`)
+        .order('created_at', { ascending: false })
+
+      if (simpleError) {
+        setError(`Could not fetch orders: ${simpleError.message}`)
+      } else {
+        setOrders(simpleData || [])
+      }
     } else {
       setOrders(data || [])
     }
+
     setLoading(false)
   }
 
@@ -109,9 +136,9 @@ export default function MyOrders() {
               const addr         = order?.addresses ?? null
               const items        = Array.isArray(order?.order_items) ? order.order_items : []
 
-              const statusInfo = STATUS_LABELS[statusKey]
+              const statusInfo = STATUS_LABELS[statusKey.toLowerCase()]
                 ?? { label: statusKey || 'Unknown', cls: 'status--placed' }
-              const payInfo = PAYMENT_LABELS[payStatusKey]
+              const payInfo = PAYMENT_LABELS[payStatusKey.toLowerCase()]
                 ?? { label: payStatusKey || 'Unknown', cls: 'status--pending' }
 
               return (
@@ -142,7 +169,7 @@ export default function MyOrders() {
                         {payInfo.label}
                       </span>
                       <span className="order-pay-method">
-                        {payMethod === 'cod' ? '💵 COD' : '📱 UPI'}
+                        {payMethod.toLowerCase() === 'cod' ? '💵 COD' : '📱 UPI'}
                       </span>
                     </div>
                   </div>

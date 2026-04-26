@@ -96,7 +96,8 @@ export const verifyPayment = async (req, res) => {
     const { error: updateError } = await supabase
       .from("orders")
       .update({
-        status: "PAID",
+        status: "paid",
+        payment_status: "paid",
         transaction_id: transactionId,
       })
       .eq("id", orderId);

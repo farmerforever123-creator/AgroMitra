@@ -20,8 +20,13 @@ export default function Products() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
+    const role = localStorage.getItem('role');
+    if (role === 'seller' || role === 'farmer') {
+      navigate('/seller-dashboard');
+      return;
+    }
     fetchProducts()
-  }, [])
+  }, [navigate])
 
   async function fetchProducts() {
     setLoading(true)

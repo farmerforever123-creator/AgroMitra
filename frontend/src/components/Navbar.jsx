@@ -45,9 +45,9 @@ export default function Navbar() {
     if (!currentUser) { setCartCount(0); return }
 
     const { count } = await supabase
-      .from('cart_items')
+      .from('cart')
       .select('*', { count: 'exact', head: true })
-      .eq('buyer_id', currentUser.id)
+      .eq('user_id', currentUser.id)
 
     setCartCount(count || 0)
   }
@@ -56,8 +56,10 @@ export default function Navbar() {
     setDropOpen(false)
     setMenuOpen(false)
     await supabase.auth.signOut()
+    localStorage.clear() // Clear role and user data
     setUser(null)
     setCartCount(0)
+    window.dispatchEvent(new Event('authChange'))
     navigate('/')
   }
 
@@ -119,6 +121,9 @@ export default function Navbar() {
                   <Link to="/addresses" className="nav-drop-item" onClick={() => setDropOpen(false)}>
                     <span>📍</span> Addresses
                   </Link>
+                  <Link to="/order-tracking" className="nav-drop-item" onClick={() => setDropOpen(false)}>
+                    <span>🚚</span> Track Your Order
+                  </Link>
                   <div className="nav-drop-divider" />
                   <button className="nav-drop-item nav-drop-logout" onClick={handleLogout}>
                     <span>🚪</span> Logout
@@ -157,6 +162,7 @@ export default function Navbar() {
               <Link onClick={() => setMenuOpen(false)} to="/profile">👤 Profile</Link>
               <Link onClick={() => setMenuOpen(false)} to="/my-orders">📦 My Orders</Link>
               <Link onClick={() => setMenuOpen(false)} to="/addresses">📍 Addresses</Link>
+              <Link onClick={() => setMenuOpen(false)} to="/order-tracking">🚚 Track Your Order</Link>
               <button onClick={handleLogout} className="mobile-logout-btn">🚪 Logout</button>
             </>
           )}

@@ -95,24 +95,29 @@ export default function SellerDashboard() {
       setMessage({ text: "", type: "" });
       const slug = createSlug(formData.name);
 
-      const { data: productData, error: productError } = await supabase
-        .from("products")
-        .insert({
-          farmer_id: user.id,
-          category_id: formData.category_id || null,
+      // 3. Call Backend API to Insert Product
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/products`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({
           name: formData.name.trim(),
-          slug,
+          price: formData.price,
           description: formData.description.trim(),
-          price: Number(formData.price),
-          stock_quantity: Number(formData.stock_quantity),
+          image_url: formData.image_url.trim(),
+          category_id: formData.category_id || null,
           unit: formData.unit,
-          is_active: true,
-          is_approved: true,
-        })
-        .select()
-        .single();
+          stock_quantity: formData.stock_quantity,
+        }),
+      });
 
-      if (productError) throw productError;
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "Failed to add product");
+
+      const productData = result.product;
 
       if (formData.image_url.trim() && productData?.id) {
         const { error: imgErr } = await supabase.from("product_images").insert({
