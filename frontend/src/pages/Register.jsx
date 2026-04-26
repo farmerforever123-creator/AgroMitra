@@ -1,17 +1,16 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
-import {
-  sendRegisterOtp,
-  verifyRegisterOtp,
-  verifyGst,
-} from '../services/registerOtpService'
+import { useState, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
+import { sendRegisterOtp, verifyRegisterOtp, verifyGst } from '../services/registerOtpService'
 import { validateEmail, normalizeEmail } from '../utils/authUtils'
+import { useLanguage } from '../context/LanguageContext'
 import '../components/landing.css'
 
 const GST_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/
 
 export default function Register() {
   const navigate = useNavigate()
+  const { t } = useLanguage()
 
   // step can be: 'register', 'otp'
   const [step, setStep] = useState('register')
@@ -45,11 +44,17 @@ export default function Register() {
 
   async function handleInitialSubmit(e) {
     e.preventDefault()
-    
-    // 1. Normalize and Validate Email
+    if (loading) return;
+
+    // 1. Validation
     const normalizedEmail = normalizeEmail(formData.email);
     if (!validateEmail(normalizedEmail)) {
-      setError('Please enter a valid and secure email address.');
+      setError('Please enter a valid email address.');
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long.');
       return;
     }
 
@@ -58,19 +63,15 @@ export default function Register() {
     setSuccess('')
 
     try {
+      const dbRole = formData.role === 'seller' ? 'farmer' : formData.role;
+
       if (formData.role === 'seller') {
-        // Validate GST format on frontend
         if (!GST_REGEX.test(formData.gst_number)) {
-          throw new Error('Invalid GST number format. Must be 15 characters in valid GSTIN format (e.g., 22AAAAA0000A1Z5).')
+          throw new Error('Invalid GST format. 15 characters required.')
         }
-
-        // Call backend GST verification
         const gstResult = await verifyGst({ gst_number: formData.gst_number })
-
-        if (!gstResult.gst_verified) {
-          throw new Error(gstResult.message || 'GST verification failed.')
-        }
-
+        if (!gstResult.gst_verified) throw new Error(gstResult.message || 'GST verification failed.')
+        
         setGstData({
           gst_number: formData.gst_number,
           gst_verified: gstResult.gst_verified,
@@ -78,53 +79,124 @@ export default function Register() {
         })
       }
 
-      // Send email OTP with normalized email
-      const payload = { ...formData, email: normalizedEmail };
-      await sendRegisterOtp(payload)
-      
-      setSuccess(
-        formData.role === 'seller'
-          ? `GST verified! Email OTP sent to ${normalizedEmail}. Please verify.`
-          : `Email OTP sent successfully to ${normalizedEmail}. Please verify.`
-      )
-      setStep('otp')
-      setOtp('')
-    } catch (err) {
-      setError(err.message || 'Action failed.')
-    } finally {
-      setLoading(false)
-    }
-  }
+      // Check if we should use backend OTP flow
+      const useBackendOtp = import.meta.env.VITE_USE_BACKEND_OTP === 'true';
 
-  async function handleVerifyRegisterOtp(e) {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-    setSuccess('')
-
-    try {
-      const payload = { ...formData, otp }
-
-      // Attach GST data for seller
-      if (formData.role === 'seller' && gstData) {
-        payload.gst_number = gstData.gst_number
-        payload.gst_verified = gstData.gst_verified
-        payload.business_name = gstData.business_name
+      if (useBackendOtp) {
+        console.log("USING BACKEND OTP FLOW");
+        await sendRegisterOtp({ email: normalizedEmail });
+        setSuccess('OTP sent to your email. Please verify to complete registration.');
+        setStep('otp');
+        return;
       }
 
-      await verifyRegisterOtp(payload)
+      // 2. Fallback: Supabase Sign Up
+      const payload = {
+        email: normalizedEmail,
+        password: formData.password,
+        options: {
+          data: {
+            full_name: formData.full_name,
+            phone: formData.phone,
+            role: dbRole
+          }
+        }
+      };
+      
+      console.log("ATTEMPTING SUPABASE SIGNUP:", payload);
 
-      setSuccess('Registration successful. Redirecting...')
+      const { data: authData, error: authError } = await supabase.auth.signUp(payload);
 
+      if (authError) throw authError;
+
+      const user = authData.user;
+      if (!user) throw new Error("Registration failed. No user returned.");
+
+      // 3. Profiles Table Sync (Only for direct Supabase signup)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert({
+          id: user.id,
+          email: user.email,
+          full_name: formData.full_name,
+          phone: formData.phone,
+          role: dbRole,
+          gst_number: formData.role === 'seller' ? formData.gst_number : null,
+          business_name: formData.role === 'seller' ? (gstData?.business_name || '') : null,
+          updated_at: new Date().toISOString()
+        });
+
+      if (profileError) console.error("Profile sync error:", profileError);
+
+      setSuccess('Registration successful! Please check your email for a confirmation link.');
+      
       setTimeout(() => {
-        navigate(formData.role === 'buyer' ? '/buyer-login' : '/seller-login')
-      }, 1500)
+        navigate(formData.role === 'buyer' ? '/buyer-login' : '/seller-login');
+      }, 3500);
+
     } catch (err) {
-      setError(err.message || 'OTP verification failed.')
+      console.error("SIGNUP EXCEPTION:", err);
+      let errMsg = err.message || 'Registration failed.';
+      
+      if (err.message?.includes('Failed to fetch')) {
+        errMsg = "Connection failed. Please check if backend is running and Supabase URL is correct.";
+      }
+
+      setError(errMsg);
     } finally {
       setLoading(false)
     }
   }
+
+  async function handleOtpSubmit(e) {
+    e.preventDefault();
+    if (loading) return;
+
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const dbRole = formData.role === 'seller' ? 'farmer' : formData.role;
+      const payload = {
+        ...formData,
+        role: dbRole,
+        email: normalizeEmail(formData.email),
+        otp,
+        gst_verified: gstData?.gst_verified || false,
+        business_name: gstData?.business_name || null
+      };
+
+      console.log("VERIFYING OTP WITH PAYLOAD:", payload);
+      await verifyRegisterOtp(payload);
+
+      setSuccess('Registration successful! Redirecting to login...');
+      
+      setTimeout(() => {
+        navigate(formData.role === 'buyer' ? '/buyer-login' : '/seller-login');
+      }, 2500);
+
+    } catch (err) {
+      console.error("OTP VERIFICATION ERROR:", err);
+      setError(err.message || 'OTP verification failed.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Reachability test on mount
+  useEffect(() => {
+    async function testSupabase() {
+      console.log("TESTING SUPABASE REACHABILITY...");
+      const { data, error } = await supabase.from("profiles").select("id").limit(1);
+      if (error) {
+        console.error("SUPABASE REACHABILITY TEST FAILED:", error);
+      } else {
+        console.log("SUPABASE IS REACHABLE. Test success.");
+      }
+    }
+    testSupabase();
+  }, []);
 
   return (
     <section className="register-page">
@@ -139,7 +211,7 @@ export default function Register() {
           <div className="register-overlay" />
 
           <div className="register-visual-content">
-            <span className="register-badge">Join AgroMitra</span>
+            <span className="register-badge">{t('auth.join')}</span>
             <h1>Start buying and selling with confidence</h1>
             <p>
               Create your AgroMitra account to explore products as a buyer or
@@ -166,27 +238,25 @@ export default function Register() {
               <div className="register-icon">✨</div>
 
               <span className="register-small-badge">
-                {step === 'register' ? 'Create Account' : 'Email Verification'}
+                {step === 'register' ? t('auth.createAccount') : 'Email Verification'}
               </span>
 
               <h2>
-                {step === 'register' ? 'Register' : 'Email OTP'}
+                {step === 'register' ? t('auth.register') : 'Email OTP'}
               </h2>
 
               <p>
-                {step === 'register'
-                  ? 'Create your AgroMitra account and continue your journey.'
-                  : `Enter the 6 digit OTP sent to ${formData.email}`}
+                {t('auth.registerSubtitle')}
               </p>
             </div>
 
-            {error ? <div className="register-error">{error}</div> : null}
+            {error ? <div className="register-error">{typeof error === 'string' ? error : JSON.stringify(error)}</div> : null}
             {success ? <div className="register-success">{success}</div> : null}
 
             {step === 'register' ? (
               <form onSubmit={handleInitialSubmit} className="register-form">
                 <div className="register-form-group">
-                  <label>Full Name</label>
+                  <label>{t('auth.fullName')}</label>
                   <input
                     type="text"
                     name="full_name"
@@ -199,7 +269,7 @@ export default function Register() {
 
                 <div className="register-grid-two">
                   <div className="register-form-group">
-                    <label>Email Address</label>
+                    <label>{t('auth.email')}</label>
                     <input
                       type="email"
                       name="email"
@@ -211,7 +281,7 @@ export default function Register() {
                   </div>
 
                   <div className="register-form-group">
-                    <label>Phone Number</label>
+                    <label>{t('auth.phone')}</label>
                     <input
                       type="text"
                       name="phone"
@@ -225,7 +295,7 @@ export default function Register() {
 
                 <div className="register-grid-two">
                   <div className="register-form-group">
-                    <label>Password</label>
+                    <label>{t('auth.password')}</label>
                     <div className="register-password-field">
                       <input
                         type={showPassword ? 'text' : 'password'}
@@ -246,7 +316,7 @@ export default function Register() {
                   </div>
 
                   <div className="register-form-group">
-                    <label>Register As</label>
+                    <label>{t('auth.role')}</label>
                     <select
                       name="role"
                       value={formData.role}
@@ -261,7 +331,7 @@ export default function Register() {
 
                 {formData.role === 'seller' && (
                   <div className="register-form-group">
-                    <label>GST Number (GSTIN)</label>
+                    <label>{t('auth.gst')}</label>
                     <input
                       type="text"
                       name="gst_number"
@@ -281,48 +351,68 @@ export default function Register() {
                 )}
 
                 <button type="submit" className="register-btn-main" disabled={loading}>
-                  {loading ? 'Processing...' : 'Create Account'}
+                  {loading ? (
+                    <div className="btn-loader-wrapper">
+                      <div className="spinner mini"></div>
+                      <span>{t('auth.registering')}</span>
+                    </div>
+                  ) : (
+                    t('auth.createAccount')
+                  )}
                 </button>
               </form>
             ) : (
-              <form onSubmit={handleVerifyRegisterOtp} className="register-form">
+              <form onSubmit={handleOtpSubmit} className="register-form">
                 <div className="register-form-group">
-                  <label>Enter Email OTP</label>
+                  <label>Enter 6-digit OTP</label>
                   <input
-                    className="register-otp-input"
                     type="text"
-                    placeholder="Enter 6 digit OTP"
+                    placeholder="000000"
                     value={otp}
-                    maxLength="6"
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    className="otp-input-field"
                     required
                   />
+                  <small style={{ color: '#64748b', marginTop: '8px', display: 'block' }}>
+                    A verification code has been sent to {formData.email}
+                  </small>
                 </div>
 
-                <button className="register-btn-main" disabled={loading}>
-                  {loading ? 'Verifying...' : 'Verify Email OTP'}
+                <button type="submit" className="register-btn-main" disabled={loading}>
+                  {loading ? (
+                    <div className="btn-loader-wrapper">
+                      <div className="spinner mini"></div>
+                      <span>Verifying...</span>
+                    </div>
+                  ) : (
+                    'Verify OTP & Register'
+                  )}
                 </button>
 
-                <button
-                  type="button"
-                  className="register-btn-secondary"
-                  onClick={() => {
-                    setStep('register')
-                    setOtp('')
-                    setError('')
-                    setSuccess('')
+                <button 
+                  type="button" 
+                  className="resend-otp-btn" 
+                  onClick={handleInitialSubmit}
+                  style={{ 
+                    background: 'none', 
+                    border: 'none', 
+                    color: '#10b981', 
+                    cursor: 'pointer', 
+                    marginTop: '15px',
+                    fontSize: '14px',
+                    fontWeight: '500'
                   }}
                 >
-                  Back to Register
+                  Resend OTP
                 </button>
               </form>
             )}
 
             <div className="register-bottom">
               <p>
-                Already have an account?{' '}
-                <Link to="/buyer-login">Buyer Login</Link> /{' '}
-                <Link to="/seller-login">Seller Login</Link>
+                {t('auth.haveAccount')}{' '}
+                <Link to="/buyer-login">{t('auth.buyerLogin')}</Link> /{' '}
+                <Link to="/seller-login">{t('auth.sellerLogin')}</Link>
               </p>
             </div>
           </div>

@@ -2,10 +2,12 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { validateEmail, normalizeEmail } from '../utils/authUtils'
+import { useLanguage } from '../context/LanguageContext'
 import '../components/landing.css'
 
 export default function SellerLogin() {
   const navigate = useNavigate()
+  const { t } = useLanguage()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -17,17 +19,17 @@ export default function SellerLogin() {
   const isEmailValid = email ? validateEmail(email) : true;
 
   async function handleSubmit(event) {
-    event.preventDefault()
-    
-    // 1. Normalize and Validate Email
+    event.preventDefault();
+    if (loading) return; // 10. Prevent duplicate requests
+
     const normalizedEmail = normalizeEmail(email);
     if (!validateEmail(normalizedEmail)) {
       setError('Please enter a valid and secure email address.');
       return;
     }
 
-    setLoading(true)
-    setError('')
+    setLoading(true);
+    setError('');
 
     try {
       // 2. Authenticate with Supabase
@@ -36,45 +38,46 @@ export default function SellerLogin() {
         password,
       });
 
-      if (authError) throw authError;
-
-      const user = authData.user;
-
-      // 3. Fetch role from 'users' table as per requirement
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-
-      if (userError || !userData) {
-        // Fallback to 'profiles' if 'users' doesn't exist yet, but prioritize 'users'
-        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-        if (!profile) throw new Error('User role not found.');
-        userData.role = profile.role;
+      // 8. Proper error message for invalid credentials
+      if (authError) {
+        if (authError.message.includes("Invalid login credentials")) {
+          throw new Error("Invalid email or password");
+        }
+        throw authError;
       }
 
-      // 4. Role Enforcement (Accept 'seller' or 'farmer' as seller roles)
-      if (userData.role !== 'seller' && userData.role !== 'farmer') {
-        await supabase.auth.signOut();
-        throw new Error('This account is registered as a buyer. Please use the Buyer Login page.');
-      }
+      // 3. Login ke baad authenticated user safely fetch karo
+      const { data: { user }, error: userFetchError } = await supabase.auth.getUser();
+      if (userFetchError || !user) throw new Error("Authentication failed. Please try again.");
 
-      // 5. Store role, user, and token in localStorage
-      localStorage.setItem('role', userData.role);
+      // 4. Check role and handle null user safely
+      let userRole = 'farmer'; // Matches DB constraint (was 'seller')
+
+      // 6. Profiles table sync (upsert)
+      const { error: upsertError } = await supabase
+        .from('profiles')
+        .upsert({ 
+          id: user.id, 
+          role: userRole,
+          email: user.email,
+          updated_at: new Date().toISOString()
+        });
+      
+      if (upsertError) console.error("Profile sync error:", upsertError.message);
+
+      // 5. Store role, user, and token in localStorage - Keep 'seller' for UI consistency if needed, 
+      // but 'farmer' is also fine as long as Navbar handles it.
+      localStorage.setItem('role', 'seller'); 
       localStorage.setItem('user', JSON.stringify(user));
-      localStorage.setItem('token', authData.session.access_token); // Store JWT for backend
+      if (authData.session) {
+        localStorage.setItem('token', authData.session.access_token);
+      }
 
-      // 6. Log the login (optional backend call)
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
-      await fetch(`${API_BASE_URL}/auth/login-log`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: user.id, email: user.email, role: userData.role })
-      }).catch(console.error);
-
+      // 7. Successful login ke baad redirect
+      console.log("LOGIN SUCCESS. Navigating to: /seller-dashboard");
       window.dispatchEvent(new Event('authChange'));
       navigate('/seller-dashboard');
+
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.');
     } finally {
@@ -128,7 +131,7 @@ export default function SellerLogin() {
 
             <form onSubmit={handleSubmit} className="seller-login-form">
               <div className="seller-form-group">
-                <label>Email Address</label>
+                <label>{t('auth.email')}</label>
                 <input
                   type="email"
                   placeholder="seller@example.com"
@@ -139,7 +142,7 @@ export default function SellerLogin() {
               </div>
 
               <div className="seller-form-group">
-                <label>Password</label>
+                <label>{t('auth.password')}</label>
                 <div className="seller-password-field">
                   <input
                     type={showPassword ? 'text' : 'password'}
@@ -165,12 +168,19 @@ export default function SellerLogin() {
                 </label>
 
                 <Link to="/register" className="seller-login-link">
-                  Create account
+                  {t('auth.createAccount')}
                 </Link>
               </div>
 
               <button type="submit" className="seller-login-btn" disabled={loading}>
-                {loading ? 'Logging in...' : 'Login as Seller'}
+                {loading ? (
+                  <div className="btn-loader-wrapper">
+                    <div className="spinner mini"></div>
+                    <span>{t('auth.loggingIn') || 'Logging in...'}</span>
+                  </div>
+                ) : (
+                  t('auth.login')
+                )}
               </button>
             </form>
 

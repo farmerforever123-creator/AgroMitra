@@ -15,16 +15,22 @@ const ProtectedRoute = ({ children, requiredRole, redirectTo }) => {
 
   // 1. If not logged in, redirect to appropriate login page
   if (!role || !user) {
-    return <Navigate to={requiredRole === 'seller' ? '/seller-login' : '/buyer-login'} replace />;
+    const loginPath = requiredRole === 'seller' ? '/seller-login' : '/buyer-login';
+    console.log("NOT LOGGED IN. Navigating to:", loginPath);
+    return <Navigate to={loginPath} replace />;
   }
 
   // 2. If logged in but has the WRONG role
-  if (role !== requiredRole) {
+  const isAuthorized = role === requiredRole || (requiredRole === 'seller' && role === 'farmer');
+  
+  if (!isAuthorized) {
     // Prevent sellers from accessing buyer pages and vice versa
+    console.log(`WRONG ROLE (${role} != ${requiredRole}). Navigating to:`, redirectTo);
     return <Navigate to={redirectTo} replace />;
   }
 
   // 3. Authorized
+  console.log(`AUTHORIZED for ${requiredRole}:`, window.location.pathname);
   return children;
 };
 

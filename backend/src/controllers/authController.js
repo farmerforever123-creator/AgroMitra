@@ -46,7 +46,7 @@ export const registerUser = async (req, res) => {
       return res.status(400).json({ message: errorMsg });
     }
 
-    const assignedRole = role === "seller" || role === "farmer" ? "seller" : "buyer";
+    const assignedRole = role === "seller" || role === "farmer" ? "farmer" : "buyer";
 
     // 🔍 CHECK DUPLICATE FROM DB
     const { data: existingUser } = await supabase

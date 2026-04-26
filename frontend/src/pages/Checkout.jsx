@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useLanguage } from '../context/LanguageContext'
 import '../components/landing.css'
 
 export default function Checkout() {
   const navigate = useNavigate()
+  const { t } = useLanguage()
 
   const [user, setUser] = useState(null)
   const [items, setItems] = useState([])
@@ -129,7 +131,7 @@ export default function Checkout() {
         {/* Header */}
         <div className="checkout-header">
           <span>Checkout</span>
-          <h1>Complete Your Order</h1>
+          <h1>{t('checkoutPage.title')}</h1>
           <p>Review your items and select a delivery address.</p>
         </div>
 
@@ -181,7 +183,7 @@ export default function Checkout() {
             {/* Delivery Address */}
             <div className="checkout-card">
               <div className="checkout-card-header">
-                <h2 className="checkout-card-title">📍 Delivery Address</h2>
+                <h2 className="checkout-card-title">📍 {t('checkoutPage.shippingDetails')}</h2>
                 <Link to="/addresses" className="checkout-change-btn">
                   {address ? 'Change' : 'Add Address'}
                 </Link>
@@ -238,7 +240,7 @@ export default function Checkout() {
                 onClick={handleContinue}
                 disabled={!address || stockWarnings.length > 0}
               >
-                Continue to Payment →
+                {t('checkoutPage.placeOrder')} →
               </button>
 
               {!address && (

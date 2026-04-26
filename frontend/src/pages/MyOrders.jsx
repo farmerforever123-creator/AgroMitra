@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import axios from 'axios'
+import { useLanguage } from '../context/LanguageContext'
 import '../components/landing.css'
 
 const STATUS_LABELS = {
@@ -40,6 +41,7 @@ function formatDate(raw) {
 
 export default function MyOrders() {
   const navigate = useNavigate()
+  const { t } = useLanguage()
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -110,7 +112,7 @@ export default function MyOrders() {
       <div className="orders-container">
         <div className="orders-header">
           <span>My Account</span>
-          <h1>My Orders</h1>
+          <h1>{t('ordersPage.title')}</h1>
           <p>Track all your purchases from AgroMitra.</p>
         </div>
 
@@ -119,7 +121,7 @@ export default function MyOrders() {
         {orders.length === 0 ? (
           <div className="orders-empty">
             <div className="orders-empty-icon">📦</div>
-            <h2>No orders yet</h2>
+            <h2>{t('ordersPage.noOrders')}</h2>
             <p>Start shopping to see your orders here.</p>
             <Link to="/products" className="orders-shop-btn">Explore Products</Link>
           </div>
@@ -146,11 +148,11 @@ export default function MyOrders() {
                   <div className="order-card-top">
                     <div className="order-meta">
                       <div>
-                        <span className="order-label">Order ID</span>
+                        <span className="order-label">{t('ordersPage.orderId')}</span>
                         <span className="order-id">#{orderId}</span>
                       </div>
                       <div>
-                        <span className="order-label">Date</span>
+                        <span className="order-label">{t('ordersPage.date')}</span>
                         <span className="order-date">{date}</span>
                       </div>
                       <div>

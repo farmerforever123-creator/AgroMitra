@@ -16,17 +16,19 @@ export default function ProductDetail() {
   async function fetchProduct() {
     setLoading(true);
     try {
-      // Using API call as per instructions
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'}/products/${id}`);
-      const data = await response.json();
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
       
-      console.log("Product ID:", id); // Console Debugging
-      console.log("Product Data:", data); // Console Debugging
+      console.log("Product ID:", id);
+      console.log("Product Data:", data);
       
-      if (response.ok) {
+      if (data) {
         setProduct(data);
-      } else {
-        console.error("Error fetching product:", data.message);
+      } else if (error) {
+        console.error("Error fetching product:", error.message);
       }
     } catch (error) {
       console.error("Error fetching product:", error);
@@ -84,9 +86,7 @@ export default function ProductDetail() {
   if (!product) return <div className="products-empty-pro"><h2>Product not found</h2></div>;
 
   const image =
-    product?.product_images?.find((img) => img.is_primary)?.image_url ||
-    product?.product_images?.[0]?.image_url ||
-    product?.image_url ||
+    product?.image ||
     'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=500&q=80';
 
   return (
@@ -102,7 +102,7 @@ export default function ProductDetail() {
           </div>
           <div style={{ flex: '1', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <span className="shop-tag" style={{ display: 'inline-block', marginBottom: '10px' }}>
-              {product.categories?.name || 'Agriculture'}
+              {product.category || 'Agriculture'}
             </span>
             <h1 style={{ fontSize: '28px', color: '#1f2937', marginBottom: '15px' }}>{product.name}</h1>
             
@@ -116,7 +116,7 @@ export default function ProductDetail() {
             </p>
             
             <p className="shop-pack" style={{ marginBottom: '30px' }}>
-              Available Stock: {product.stock_quantity || 0} {product.unit || 'pack'}
+              Available Stock: {product.stock || 0}
             </p>
             
             <button 

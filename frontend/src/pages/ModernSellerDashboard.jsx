@@ -1,14 +1,24 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { useTranslation } from 'react-i18next';
 import "./ModernSellerDashboard.css";
 
+const dummyOrders = [
+  { id: "ORD-101", product: "Organic Wheat", buyer: "Rahul Sharma", qty: 5, status: "Pending" },
+  { id: "ORD-102", product: "Rice Seeds", buyer: "Amit Singh", qty: 2, status: "Shipped" },
+  { id: "ORD-103", product: "NPK Fertilizer", buyer: "Vikas Kumar", qty: 1, status: "Delivered" },
+];
+
 const ModernSellerDashboard = () => {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("addProduct");
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState({ type: "", message: "" });
 
   // Tab 1: Add Product State
-  const [productData, setProductData] = useState({ name: "", price: "", description: "" });
+  const [productData, setProductData] = useState({ name: "", price: "", description: "", unit: "piece" });
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const fileInputRef = useRef(null);
@@ -56,18 +66,44 @@ const ModernSellerDashboard = () => {
         .getPublicUrl(fileName);
 
       // 3. Direct Supabase Insert (Recommended Fix for 401)
-      const { error: dbError } = await supabase
-        .from("seller_product")
-        .insert([
-          {
-            name: productData.name,
-            price: parseFloat(productData.price),
-            description: productData.description,
-            image: publicUrl,
-          },
-        ]);
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData?.user;
+
+      const generateSlug = (name) => {
+        return name
+          .toLowerCase()
+          .replace(/[^\w ]+/g, "")
+          .replace(/ +/g, "-") + "-" + Date.now().toString(36);
+      };
+
+      const productPayload = {
+        farmer_id: user?.id,
+        seller_id: user?.id, // Keep both for safety
+        name: productData.name,
+        slug: generateSlug(productData.name),
+        price: parseFloat(productData.price),
+        description: productData.description,
+        unit: productData.unit || "piece",
+        image: publicUrl,
+        image_url: publicUrl, // Duplicate column sync
+        stock: 100, 
+        stock_quantity: 100, // Duplicate column sync
+        category: "seeds", 
+        is_active: true,
+        is_approved: true, // Auto-approve
+      };
+
+      console.log("ADDING PRODUCT (Modern):", productPayload);
+
+      const { data: newProduct, error: dbError } = await supabase
+        .from("products")
+        .insert([productPayload])
+        .select()
+        .single();
 
       if (dbError) throw dbError;
+
+      console.log("ADDED PRODUCT (Modern):", newProduct);
 
       setStatus({ type: "success", message: "Product added successfully! 🌱" });
       setProductData({ name: "", price: "", description: "" });
@@ -83,15 +119,23 @@ const ModernSellerDashboard = () => {
 
   // --- TAB 2: PRODUCT LIST LOGIC ---
   const fetchProducts = async () => {
-    // Note: Removed created_at ordering to avoid 400 error if column is missing
-    const { data, error } = await supabase.from("seller_product").select("*");
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData?.user) return;
+
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .or(`farmer_id.eq.${userData.user.id},seller_id.eq.${userData.user.id}`)
+      .order("created_at", { ascending: false });
+
+    console.log("FETCHED SELLER PRODUCTS (Modern):", data);
     if (!error) setProducts(data);
     else console.error("Fetch Error:", error);
   };
 
   const deleteProduct = async (id) => {
     if (!window.confirm("Are you sure you want to delete this product?")) return;
-    const { error } = await supabase.from("seller_product").delete().eq("id", id);
+    const { error } = await supabase.from("products").delete().eq("id", id);
     if (!error) fetchProducts();
     else alert("Delete failed: " + error.message);
   };
@@ -123,7 +167,7 @@ const ModernSellerDashboard = () => {
     await supabase.auth.signOut();
     localStorage.clear();
     window.dispatchEvent(new Event("authChange"));
-    window.location.href = "/seller-login";
+    navigate("/seller-login");
   };
 
   return (
@@ -136,20 +180,20 @@ const ModernSellerDashboard = () => {
         </div>
         <nav className="msd-nav">
           <button className={`msd-nav-item ${activeTab === "addProduct" ? "active" : ""}`} onClick={() => setActiveTab("addProduct")}>
-            ➕ <span>Add Product</span>
+            ➕ <span>{t('dashboard.addProductTab')}</span>
           </button>
           <button className={`msd-nav-item ${activeTab === "productList" ? "active" : ""}`} onClick={() => setActiveTab("productList")}>
-            📦 <span>Product List</span>
+            📦 <span>{t('dashboard.productListTab')}</span>
           </button>
           <button className={`msd-nav-item ${activeTab === "orderList" ? "active" : ""}`} onClick={() => setActiveTab("orderList")}>
-            📋 <span>Order List</span>
+            📋 <span>{t('dashboard.orderListTab')}</span>
           </button>
           <button className={`msd-nav-item ${activeTab === "sellerAccount" ? "active" : ""}`} onClick={() => setActiveTab("sellerAccount")}>
-            👤 <span>Seller Account</span>
+            👤 <span>{t('dashboard.sellerAccountTab')}</span>
           </button>
           
           <button className="msd-nav-item logout" onClick={handleLogout} style={{ marginTop: 'auto', color: '#ef4444' }}>
-            🚪 <span>Logout</span>
+            🚪 <span>{t('dashboard.logout')}</span>
           </button>
         </nav>
       </aside>
@@ -157,9 +201,9 @@ const ModernSellerDashboard = () => {
       {/* Main Content Area */}
       <main className="msd-main">
         <header className="msd-content-header">
-          <h1>{activeTab === "addProduct" ? "Add New Product" : 
-               activeTab === "productList" ? "My Products" : 
-               activeTab === "orderList" ? "Customer Orders" : "Account Settings"}</h1>
+          <h1>{activeTab === "addProduct" ? t('dashboard.addNewProduct') : 
+               activeTab === "productList" ? t('dashboard.myProducts') : 
+               activeTab === "orderList" ? t('dashboard.customerOrders') : t('dashboard.accountSettings')}</h1>
         </header>
 
         {status.message && <div className={`msd-status ${status.type}`}>{status.message}</div>}
@@ -172,19 +216,32 @@ const ModernSellerDashboard = () => {
             <div className="msd-card">
               <form className="msd-form" onSubmit={handleProductSubmit}>
                 <div className="msd-field">
-                  <label>Product Name *</label>
-                  <input type="text" placeholder="e.g. Premium Wheat" value={productData.name} onChange={e => setProductData({...productData, name: e.target.value})} required />
+                  <label>{t('addProduct.nameLabel')} *</label>
+                  <input type="text" placeholder={t('addProduct.namePlaceholder')} value={productData.name} onChange={e => setProductData({...productData, name: e.target.value})} required />
                 </div>
                 <div className="msd-field">
-                  <label>Price (₹) *</label>
-                  <input type="number" placeholder="0.00" value={productData.price} onChange={e => setProductData({...productData, price: e.target.value})} required />
+                  <label>{t('addProduct.priceLabel')} *</label>
+                  <input type="number" placeholder={t('addProduct.pricePlaceholder')} value={productData.price} onChange={e => setProductData({...productData, price: e.target.value})} required />
                 </div>
                 <div className="msd-field">
-                  <label>Description *</label>
-                  <textarea rows="4" placeholder="Brief details about origin, quality..." value={productData.description} onChange={e => setProductData({...productData, description: e.target.value})} required />
+                  <label>Unit *</label>
+                  <select value={productData.unit} onChange={e => setProductData({...productData, unit: e.target.value})} required>
+                    <option value="kg">kg</option>
+                    <option value="gram">gram</option>
+                    <option value="litre">litre</option>
+                    <option value="piece">piece</option>
+                    <option value="packet">packet</option>
+                    <option value="bag">bag</option>
+                    <option value="box">box</option>
+                    <option value="dozen">dozen</option>
+                  </select>
                 </div>
                 <div className="msd-field">
-                  <label>Product Image * (Max 2MB)</label>
+                  <label>{t('addProduct.descLabel')} *</label>
+                  <textarea rows="4" placeholder={t('addProduct.descPlaceholder')} value={productData.description} onChange={e => setProductData({...productData, description: e.target.value})} required />
+                </div>
+                <div className="msd-field">
+                  <label>{t('addProduct.imageLabel')} * (Max 2MB)</label>
                   <div className="msd-upload-zone" onClick={() => fileInputRef.current.click()}>
                     <input type="file" hidden ref={fileInputRef} accept="image/*" onChange={e => {
                       const file = e.target.files[0];
@@ -194,7 +251,14 @@ const ModernSellerDashboard = () => {
                   </div>
                 </div>
                 <button className="msd-btn-primary" type="submit" disabled={loading}>
-                  {loading ? <div className="spinner"></div> : "Add Product"}
+                  {loading ? (
+                    <div className="btn-loader-wrapper">
+                      <div className="spinner mini"></div>
+                      <span>Adding...</span>
+                    </div>
+                  ) : (
+                    t('addProduct.submitBtn')
+                  )}
                 </button>
               </form>
             </div>
@@ -216,11 +280,11 @@ const ModernSellerDashboard = () => {
                     <h3>{p.name}</h3>
                     <p className="msd-product-price">₹{p.price}</p>
                     <p style={{fontSize: '14px', color: '#64748b'}}>{p.description}</p>
-                    <button className="msd-btn-danger" onClick={() => deleteProduct(p.id)} style={{marginTop: '12px'}}>Delete</button>
+                    <button className="msd-btn-danger" onClick={() => deleteProduct(p.id)} style={{marginTop: '12px'}}>{t('dashboard.delete')}</button>
                   </div>
                 </div>
               ))}
-              {products.length === 0 && <p>No products found.</p>}
+              {products.length === 0 && <p>{t('dashboard.noProducts')}</p>}
             </div>
           )}
 
@@ -257,21 +321,21 @@ const ModernSellerDashboard = () => {
             <div className="msd-card">
               <form className="msd-form" onSubmit={handleAccountUpdate}>
                 <div className="msd-form-row">
-                  <div className="msd-field"><label>Seller Name</label><input type="text" value={accountData.seller_name} onChange={e => setAccountData({...accountData, seller_name: e.target.value})} /></div>
-                  <div className="msd-field"><label>Email</label><input type="email" value={accountData.email} readOnly /></div>
+                  <div className="msd-field"><label>{t('dashboard.sellerName')}</label><input type="text" value={accountData.seller_name} onChange={e => setAccountData({...accountData, seller_name: e.target.value})} /></div>
+                  <div className="msd-field"><label>{t('dashboard.email')}</label><input type="email" value={accountData.email} readOnly /></div>
                 </div>
                 <div className="msd-form-row">
-                  <div className="msd-field"><label>Phone</label><input type="text" value={accountData.phone} onChange={e => setAccountData({...accountData, phone: e.target.value})} /></div>
-                  <div className="msd-field"><label>Shop Name</label><input type="text" value={accountData.shop_name} onChange={e => setAccountData({...accountData, shop_name: e.target.value})} /></div>
+                  <div className="msd-field"><label>{t('dashboard.phone')}</label><input type="text" value={accountData.phone} onChange={e => setAccountData({...accountData, phone: e.target.value})} /></div>
+                  <div className="msd-field"><label>{t('dashboard.shopName')}</label><input type="text" value={accountData.shop_name} onChange={e => setAccountData({...accountData, shop_name: e.target.value})} /></div>
                 </div>
-                <div className="msd-field"><label>Address</label><textarea rows="3" value={accountData.address} onChange={e => setAccountData({...accountData, address: e.target.value})} /></div>
+                <div className="msd-field"><label>{t('dashboard.address')}</label><textarea rows="3" value={accountData.address} onChange={e => setAccountData({...accountData, address: e.target.value})} /></div>
                 <div className="msd-form-row">
-                  <div className="msd-field"><label>Bank Account Number</label><input type="text" value={accountData.bank_account_number} onChange={e => setAccountData({...accountData, bank_account_number: e.target.value})} /></div>
-                  <div className="msd-field"><label>IFSC Code</label><input type="text" value={accountData.ifsc_code} onChange={e => setAccountData({...accountData, ifsc_code: e.target.value})} /></div>
+                  <div className="msd-field"><label>{t('dashboard.bankAccount')}</label><input type="text" value={accountData.bank_account_number} onChange={e => setAccountData({...accountData, bank_account_number: e.target.value})} /></div>
+                  <div className="msd-field"><label>{t('dashboard.ifsc')}</label><input type="text" value={accountData.ifsc_code} onChange={e => setAccountData({...accountData, ifsc_code: e.target.value})} /></div>
                 </div>
-                <div className="msd-field"><label>UPI ID</label><input type="text" value={accountData.upi_id} onChange={e => setAccountData({...accountData, upi_id: e.target.value})} /></div>
+                <div className="msd-field"><label>{t('dashboard.upi')}</label><input type="text" value={accountData.upi_id} onChange={e => setAccountData({...accountData, upi_id: e.target.value})} /></div>
                 <button className="msd-btn-primary" type="submit" disabled={loading}>
-                  {loading ? <div className="spinner"></div> : "Update Account"}
+                  {loading ? <div className="spinner"></div> : t('dashboard.updateAccount')}
                 </button>
               </form>
             </div>

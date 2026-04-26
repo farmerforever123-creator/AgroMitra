@@ -126,6 +126,21 @@ select {
   }
 }
 
+.spinner.mini {
+  width: 20px;
+  height: 20px;
+  border-width: 2px;
+  margin-bottom: 0;
+  border-radius: 50%;
+}
+
+.btn-loader-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
 /* ================= NAVBAR ================= */
 
 /* ================= PREMIUM FULL WIDTH NAVBAR ================= */
@@ -1787,7 +1802,14 @@ select {
 
 .register-btn-main:hover {
   transform: translateY(-2px);
-  box-shadow: 0 18px 35px rgba(22, 163, 74, 0.24);
+  box-shadow: 0 16px 34px rgba(22, 163, 74, 0.28);
+}
+
+.otp-input-field {
+  text-align: center;
+  font-size: 24px !important;
+  letter-spacing: 12px;
+  font-weight: 900 !important;
 }
 
 .register-btn-main:disabled {

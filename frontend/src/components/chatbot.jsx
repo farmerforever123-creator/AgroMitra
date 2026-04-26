@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 
 // define Brand/UX Constants for easy tuning
 const COLORS = {
@@ -13,17 +14,22 @@ const COLORS = {
 };
 
 export default function Chatbot() {
+  const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(false);
   const [visible, setVisible] = useState(false);
-  const [messages, setMessages] = useState([
-    { type: "bot", text: "Hello! Welcome to AgroMitra. How can I help you today? 🌱" }
-  ]);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
-  const [lang, setLang] = useState("en");
   const [typing, setTyping] = useState(false);
   const [isIdleBouncing, setIsIdleBouncing] = useState(true);
   const chatEndRef = useRef(null);
   const [jump, setJump] = useState(false);
+
+  // Initialize first message on load or language change
+  useEffect(() => {
+    if (messages.length <= 1) {
+      setMessages([{ type: "bot", text: t('chatbot.title') + " 👋" }]);
+    }
+  }, [i18n.language]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -123,7 +129,7 @@ export default function Chatbot() {
       const res = await fetch(`${apiUrl}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, lang }),
+        body: JSON.stringify({ message: text, lang: i18n.language }),
       });
 
       if (!res.ok) throw new Error("API Network issues");
@@ -140,15 +146,19 @@ export default function Chatbot() {
       setTimeout(() => {
         setMessages((prev) => [
           ...prev,
-          { type: "bot", text: "⚠️ Server error. Please try again later." },
+          { type: "bot", text: t('chatbot.serverError') },
         ]);
         setTyping(false);
       }, 1000);
     }
   };
 
-  const quickActions = { weather: "[Current Weather 🌤️]", price: "[Mandi Prices 🌾]", fertilizer: "[Fertilizer Tips 🧪]", disease: "[Crop Diseases 🐛]" };
-  const getSuggestionPlaceholder = () => lang === "en" ? "Ask about crops, weather, prices..." : "फ़सल, बारिश या मंडी भाव पूछें...";
+  const getQuickActions = () => ({
+    weather: t('chatbot.weather'),
+    price: t('chatbot.price'),
+    fertilizer: t('chatbot.fertilizer'),
+    disease: t('chatbot.disease')
+  });
 
   // Bot & User Avatar Components
   const BotAvatar = () => (
@@ -257,7 +267,7 @@ export default function Chatbot() {
           >
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ fontSize: 24 }}>🌿</span>
-              <span style={{ fontSize: 18, fontWeight: 700, color: "#1b5e20", letterSpacing: "-0.5px" }}>AgroMitra AI Assistant</span>
+              <span style={{ fontSize: 18, fontWeight: 700, color: "#1b5e20", letterSpacing: "-0.5px" }}>{t('chatbot.title')}</span>
             </div>
             
             <div style={{ 
@@ -273,10 +283,11 @@ export default function Chatbot() {
                 width: 8, height: 8, background: "#4caf50", borderRadius: "50%",
                 animation: "agromitra-online-pulse 2s infinite"
               }}></div>
-              <span style={{ fontSize: 12, fontWeight: 600, color: "#2e7d32" }}>Online</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#2e7d32" }}>{t('chatbot.online')}</span>
             </div>
           </div>
 
+<<<<<<< HEAD
           {/* LANGUAGE SELECTOR (Floating below header) */}
           <div style={{ display: "flex", justifyContent: "flex-end", padding: "0 20px" }}>
             <select
@@ -304,6 +315,9 @@ export default function Chatbot() {
           </div>
         </div>
       ))}
+=======
+
+>>>>>>> f04a6ef (last updated code)
 
           {/* CHAT AREA */}
           <div
@@ -327,21 +341,21 @@ export default function Chatbot() {
                     fontSize: 15, lineHeight: 1.4, borderRadius: "16px 16px 16px 4px",
                     boxShadow: "0 2px 5px rgba(0,0,0,0.05)", fontWeight: 500
                   }}>
-                    Here are some things I can help with:
+                    {t('chatbot.intro')}
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {Object.keys(quickActions).map((key) => (
+                    {Object.entries(getQuickActions()).map(([key, value]) => (
                       <button
                         key={key}
                         className="quick-action-btn"
-                        onClick={() => sendMessage(quickActions[key])}
+                        onClick={() => sendMessage(value)}
                         style={{
                           padding: "8px 12px", borderRadius: 8, border: "1px solid #4caf50",
                           background: "rgba(255,255,255,0.6)", color: "#1b5e20",
                           fontWeight: 600, fontSize: 13, cursor: "pointer", backdropFilter: "blur(4px)"
                         }}
                       >
-                        {quickActions[key]}
+                        {value}
                       </button>
                     ))}
                   </div>
@@ -364,7 +378,7 @@ export default function Chatbot() {
                 {msg.type === "bot" ? <BotAvatar /> : <UserAvatar />}
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   <span style={{ fontSize: 11, color: "rgba(0,0,0,0.5)", alignSelf: msg.type === "user" ? "flex-end" : "flex-start", marginLeft: 4, marginRight: 4 }}>
-                    {msg.type === "bot" ? "AgroMitra Bot" : "You"}
+                    {msg.type === "bot" ? t('chatbot.bot') : t('chatbot.you')}
                   </span>
                   <div
                     style={{
@@ -420,7 +434,7 @@ export default function Chatbot() {
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={getSuggestionPlaceholder()}
+              placeholder={t('chatbot.placeholder')}
               onKeyDown={(e) => {
                 if (e.key === "Enter") sendMessage();
               }}

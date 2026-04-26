@@ -19,32 +19,17 @@ export default function CategoryProducts() {
     setLoading(true)
     setError(null)
 
-    // First, find the category name from slug
-    const { data: catData, error: catErr } = await supabase
-      .from('categories')
-      .select('id, name')
-      .eq('slug', categorySlug)
-      .maybeSingle()
+    // Using categorySlug directly as the category name/value
+    setCategoryName(categorySlug.charAt(0).toUpperCase() + categorySlug.slice(1))
 
-    if (catErr || !catData) {
-      setError('Category not found.')
-      setLoading(false)
-      return
-    }
-
-    setCategoryName(catData.name)
-
-    // Fetch products for this category
+    // Fetch products for this category using the 'category' field
     const { data: prodData, error: prodErr } = await supabase
       .from('products')
-      .select(`
-        *,
-        categories(name),
-        product_images(image_url, is_primary)
-      `)
-      .eq('category_id', catData.id)
-      .eq('is_active', true)
-      .eq('is_approved', true)
+      .select('*')
+      .eq('category', categorySlug)
+      .order('created_at', { ascending: false })
+
+    console.log("FETCHED CATEGORY PRODUCTS:", prodData)
 
     if (prodErr) {
       setError('Failed to load products.')

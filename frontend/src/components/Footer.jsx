@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom'
+import { useLanguage } from '../context/LanguageContext'
 import './landing.css'
 
 export default function Footer() {
+  const { t } = useLanguage()
+
   return (
     <footer className="footer">
       <div className="container footer-grid">
@@ -16,10 +19,10 @@ export default function Footer() {
         <div className="reveal-up reveal-delay-2">
           <h4>Quick Links</h4>
           <div className="footer-links">
-            <Link to="/">Home</Link>
-            <Link to="/products">Products</Link>
-            <Link to="/contact">Contact</Link>
-            <Link to="/register">Register</Link>
+            <Link to="/">{t('navbar.home')}</Link>
+            <Link to="/products">{t('navbar.products')}</Link>
+            <Link to="/contact">{t('navbar.contact')}</Link>
+            <Link to="/register">{t('navbar.register')}</Link>
           </div>
         </div>
 
@@ -32,7 +35,7 @@ export default function Footer() {
       </div>
 
       <div className="footer-bottom">
-        © 2026 AgroMitra. All rights reserved.
+        © 2026 AgroMitra. {t('footer.rights')}
       </div>
     </footer>
   )

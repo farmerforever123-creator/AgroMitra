@@ -1,12 +1,15 @@
 import React, { useState, useRef } from "react";
 import { supabase } from "../lib/supabase";
+import { useTranslation } from 'react-i18next';
 import "./AddProduct.css";
 
 const AddProduct = () => {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     name: "",
     price: "",
     description: "",
+    unit: "piece",
   });
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
@@ -73,23 +76,45 @@ const AddProduct = () => {
       const { data: userData } = await supabase.auth.getUser();
       const user = userData?.user || JSON.parse(localStorage.getItem("user"));
       
-      const { error: dbError } = await supabase
-        .from("seller_product")
-        .insert([
-          {
-            name: formData.name,
-            price: parseFloat(formData.price),
-            description: formData.description,
-            image: publicUrl,
-            // farmer_id: user?.id, // Optional: uncomment if farmer_id is required
-          },
-        ]);
+      const generateSlug = (name) => {
+        return name
+          .toLowerCase()
+          .replace(/[^\w ]+/g, "")
+          .replace(/ +/g, "-") + "-" + Date.now().toString(36);
+      };
+      
+      const productPayload = {
+        farmer_id: user?.id,
+        seller_id: user?.id, // Keep both for safety
+        name: formData.name,
+        slug: generateSlug(formData.name),
+        price: parseFloat(formData.price),
+        description: formData.description,
+        unit: formData.unit || "piece",
+        image: publicUrl,
+        image_url: publicUrl, // Duplicate column sync
+        category: "seeds", 
+        stock: 50, 
+        stock_quantity: 50, // Duplicate column sync
+        is_active: true,
+        is_approved: true, // Auto-approve
+      };
+
+      console.log("ADDING PRODUCT (AddProduct):", productPayload);
+
+      const { data: newProduct, error: dbError } = await supabase
+        .from("products")
+        .insert([productPayload])
+        .select()
+        .single();
 
       if (dbError) throw dbError;
 
+      console.log("ADDED PRODUCT (AddProduct):", newProduct);
+
       // Success!
-      setStatus({ type: "success", message: "Product added successfully! 🌱" });
-      setFormData({ name: "", price: "", description: "" });
+      setStatus({ type: "success", message: t('addProduct.successMsg') });
+      setFormData({ name: "", price: "", description: "", unit: "piece" });
       setImageFile(null);
       setImagePreview(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -109,7 +134,7 @@ const AddProduct = () => {
     <div className="add-product-container">
       <div className="add-product-card">
         <header className="add-product-header">
-          <h1>Add New Product</h1>
+          <h1>{t('addProduct.title')}</h1>
           <p>List your agricultural produce on AgroMitra</p>
         </header>
 
@@ -121,12 +146,12 @@ const AddProduct = () => {
 
         <form onSubmit={handleSubmit} className="add-product-form">
           <div className="form-group">
-            <label htmlFor="name">Product Name</label>
+            <label htmlFor="name">{t('addProduct.nameLabel')}</label>
             <input
               type="text"
               id="name"
               name="name"
-              placeholder="e.g. Organic Basmati Rice"
+              placeholder={t('addProduct.namePlaceholder')}
               value={formData.name}
               onChange={handleInputChange}
               required
@@ -134,12 +159,12 @@ const AddProduct = () => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="price">Price (₹)</label>
+            <label htmlFor="price">{t('addProduct.priceLabel')}</label>
             <input
               type="number"
               id="price"
               name="price"
-              placeholder="0.00"
+              placeholder={t('addProduct.pricePlaceholder')}
               step="0.01"
               min="0"
               value={formData.price}
@@ -149,19 +174,39 @@ const AddProduct = () => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="description">Description</label>
+            <label htmlFor="unit">Unit *</label>
+            <select
+              id="unit"
+              name="unit"
+              value={formData.unit}
+              onChange={handleInputChange}
+              required
+            >
+              <option value="kg">kg</option>
+              <option value="gram">gram</option>
+              <option value="litre">litre</option>
+              <option value="piece">piece</option>
+              <option value="packet">packet</option>
+              <option value="bag">bag</option>
+              <option value="box">box</option>
+              <option value="dozen">dozen</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="description">{t('addProduct.descLabel')}</label>
             <textarea
               id="description"
               name="description"
               rows="4"
-              placeholder="Tell buyers about your product's quality, origin, etc."
+              placeholder={t('addProduct.descPlaceholder')}
               value={formData.description}
               onChange={handleInputChange}
             ></textarea>
           </div>
 
           <div className="form-group">
-            <label>Product Image</label>
+            <label>{t('addProduct.imageLabel')}</label>
             <div
               className={`image-upload-zone ${imagePreview ? 'has-preview' : ''}`}
               onClick={() => fileInputRef.current?.click()}
@@ -199,10 +244,10 @@ const AddProduct = () => {
             {loading ? (
               <>
                 <div className="spinner"></div>
-                Uploading...
+                {t('addProduct.loadingBtn')}
               </>
             ) : (
-              "Add Product"
+              t('addProduct.submitBtn')
             )}
           </button>
         </form>

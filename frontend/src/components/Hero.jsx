@@ -1,25 +1,27 @@
+import { Link } from 'react-router-dom'
+import { useLanguage } from '../context/LanguageContext'
 import './landing.css'
 
 export default function Hero() {
+  const { t } = useLanguage()
   return (
     <section className="hero-split">
       <div className="hero-split-left reveal-up">
         <h1>
-          India's Trusted <br />
-          <span className="highlight-green">Agriculture</span> Marketplace
+          {t('hero.title1')} <br />
+          <span className="highlight-green">{t('hero.titleHighlight')}</span> {t('hero.title2')}
         </h1>
         <p>
-          Connect directly with verified buyers and sellers. Get the best market
-          prices, secure transactions, and a smarter way to grow your farming business.
+          {t('hero.description')}
         </p>
 
         <div className="hero-split-buttons">
-          <a href="/register" className="btn btn-primary">
-            Get Started
-          </a>
-          <a href="/products" className="btn btn-secondary dark-secondary" style={{ color: '#0f172a', background: 'transparent', border: '1px solid #cbd5e1' }}>
-            Explore Marketplace
-          </a>
+          <Link to="/register" className="btn btn-primary">
+            {t('hero.getStarted')}
+          </Link>
+          <Link to="/products" className="btn btn-secondary dark-secondary" style={{ color: '#0f172a', background: 'transparent', border: '1px solid #cbd5e1' }}>
+            {t('hero.explore')}
+          </Link>
         </div>
       </div>
 
@@ -33,16 +35,16 @@ export default function Hero() {
         <div className="hero-floating-stat">
           <div className="icon">📈</div>
           <div>
-            <strong>Smart Dashboard</strong>
-            <span>Manage inventory easily</span>
+            <strong>{t('hero.stat1Title')}</strong>
+            <span>{t('hero.stat1Desc')}</span>
           </div>
         </div>
 
         <div className="hero-floating-stat second">
           <div className="icon">📱</div>
           <div>
-            <strong>Direct Buyers</strong>
-            <span>Connect instantly</span>
+            <strong>{t('hero.stat2Title')}</strong>
+            <span>{t('hero.stat2Desc')}</span>
           </div>
         </div>
       </div>

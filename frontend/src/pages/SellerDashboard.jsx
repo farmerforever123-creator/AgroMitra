@@ -47,8 +47,8 @@ export default function SellerDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [formData, setFormData] = useState({
-    name: "", description: "", price: "", stock_quantity: "",
-    unit: "kg", category_id: "", image_url: "",
+    name: "", description: "", price: "", stock: "",
+    category: "", image: "",
   });
 
   const [loading, setLoading]   = useState(false);
@@ -62,17 +62,14 @@ export default function SellerDashboard() {
     if (!u) { setMessage({ text: "Please login as seller first.", type: "error" }); return; }
     setUser(u);
 
-    const [catRes, prodRes, ordRes] = await Promise.all([
-      supabase.from("categories").select("*").order("name"),
+    const [prodRes, ordRes] = await Promise.all([
       supabase.from("products")
-        .select("*, categories(name), product_images(image_url, is_primary)")
-        .eq("farmer_id", u.id)
+        .select("*")
+        .eq("seller_id", u.id)
         .order("created_at", { ascending: false }),
-      supabase.from("orders").select("*, order_items(*, products(name, product_images(image_url, is_primary)))").order("created_at", { ascending: false })
-        .limit(50),
+      supabase.from("orders").select("*, order_items(*, products(name))").order("created_at", { ascending: false }).limit(50),
     ]);
 
-    if (catRes.data)  setCategories(catRes.data);
     if (prodRes.data) setProducts(prodRes.data);
     if (ordRes.data)  setOrders(ordRes.data);
   }
@@ -86,55 +83,43 @@ export default function SellerDashboard() {
   async function handleAddProduct(e) {
     e.preventDefault();
     if (!user) { setMessage({ text: "Please login first.", type: "error" }); return; }
-    if (!formData.name.trim() || !formData.price || !formData.stock_quantity) {
+    if (!formData.name.trim() || !formData.price || !formData.stock) {
       setMessage({ text: "Product name, price and stock are required.", type: "error" });
       return;
     }
     try {
       setLoading(true);
       setMessage({ text: "", type: "" });
-      const slug = createSlug(formData.name);
 
-      // 3. Call Backend API to Insert Product
-      const token = localStorage.getItem("token");
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/products`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name: formData.name.trim(),
-          price: formData.price,
-          description: formData.description.trim(),
-          image_url: formData.image_url.trim(),
-          category_id: formData.category_id || null,
-          unit: formData.unit,
-          stock_quantity: formData.stock_quantity,
-        }),
-      });
+      const productPayload = {
+        seller_id: user.id,
+        name: formData.name.trim(),
+        price: parseFloat(formData.price),
+        description: formData.description.trim(),
+        image: formData.image.trim(),
+        category: formData.category,
+        stock: parseInt(formData.stock),
+      };
 
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || "Failed to add product");
+      console.log("ADDING PRODUCT:", productPayload);
 
-      const productData = result.product;
+      const { data: newProduct, error } = await supabase
+        .from("products")
+        .insert([productPayload])
+        .select()
+        .single();
 
-      if (formData.image_url.trim() && productData?.id) {
-        const { error: imgErr } = await supabase.from("product_images").insert({
-          product_id: productData.id,
-          image_url: formData.image_url.trim(),
-          is_primary: true,
-          sort_order: 1,
-        });
-        if (imgErr) throw imgErr;
-      }
+      if (error) throw error;
+
+      console.log("ADDED PRODUCT:", newProduct);
 
       setMessage({ text: "✅ Product added successfully!", type: "success" });
-      setFormData({ name: "", description: "", price: "", stock_quantity: "", unit: "kg", category_id: "", image_url: "" });
+      setFormData({ name: "", description: "", price: "", stock: "", category: "", image: "" });
+      
       const { data } = await supabase
         .from("products")
-        .select("*, categories(name), product_images(image_url, is_primary)")
-        .eq("farmer_id", user.id)
+        .select("*")
+        .eq("seller_id", user.id)
         .order("created_at", { ascending: false });
       if (data) setProducts(data);
     } catch (err) {
@@ -262,14 +247,14 @@ export default function SellerDashboard() {
                   <label>Product Image URL</label>
                   <input
                     type="text"
-                    name="image_url"
+                    name="image"
                     placeholder="Paste an image URL (e.g. from Unsplash)"
-                    value={formData.image_url}
+                    value={formData.image}
                     onChange={handleChange}
                   />
-                  {formData.image_url && (
+                  {formData.image && (
                     <img
-                      src={formData.image_url}
+                      src={formData.image}
                       alt="Preview"
                       className="sd-img-preview"
                       onError={e => e.target.style.display = "none"}
@@ -305,11 +290,12 @@ export default function SellerDashboard() {
                 {/* Category */}
                 <div className="sd-form-group">
                   <label>Category</label>
-                  <select name="category_id" value={formData.category_id} onChange={handleChange}>
+                  <select name="category" value={formData.category} onChange={handleChange}>
                     <option value="">Select category</option>
-                    {categories.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
+                    <option value="seeds">Seeds</option>
+                    <option value="pesticides">Pesticides</option>
+                    <option value="insecticides">Insecticides</option>
+                    <option value="farming-tools">Farming Tools</option>
                   </select>
                 </div>
 
@@ -331,32 +317,37 @@ export default function SellerDashboard() {
                     <label>Stock Quantity <span className="sd-required">*</span></label>
                     <input
                       type="number"
-                      name="stock_quantity"
+                      name="stock"
                       placeholder="0"
                       min="0"
-                      value={formData.stock_quantity}
+                      value={formData.stock}
                       onChange={handleChange}
                       required
                     />
                   </div>
                 </div>
 
-                {/* Unit */}
+                {/* Unit (Removed as per requested schema, but keeping layout if needed) */}
                 <div className="sd-form-group">
-                  <label>Unit</label>
-                  <select name="unit" value={formData.unit} onChange={handleChange}>
-                    <option value="kg">Kg</option>
-                    <option value="quintal">Quintal</option>
-                    <option value="ton">Ton</option>
-                    <option value="piece">Piece</option>
-                    <option value="dozen">Dozen</option>
-                    <option value="litre">Litre</option>
-                    <option value="packet">Packet</option>
-                  </select>
+                   <label>Category (Custom Text)</label>
+                   <input 
+                     type="text" 
+                     name="category" 
+                     placeholder="Or type custom category" 
+                     value={formData.category} 
+                     onChange={handleChange} 
+                   />
                 </div>
 
                 <button type="submit" className="sd-btn-primary" disabled={loading}>
-                  {loading ? "Adding…" : "ADD PRODUCT"}
+                  {loading ? (
+                    <div className="btn-loader-wrapper">
+                      <div className="spinner mini"></div>
+                      <span>Adding...</span>
+                    </div>
+                  ) : (
+                    "ADD PRODUCT"
+                  )}
                 </button>
               </form>
             </div>
@@ -391,16 +382,16 @@ export default function SellerDashboard() {
                           <tr key={p.id}>
                             <td>
                               <div className="sd-product-cell">
-                                {getProductImage(p)
-                                  ? <img src={getProductImage(p)} alt={p.name} className="sd-product-thumb" />
+                                {p.image
+                                  ? <img src={p.image} alt={p.name} className="sd-product-thumb" />
                                   : <div className="sd-product-thumb sd-thumb-placeholder">🌾</div>
                                 }
                                 <span>{p.name}</span>
                               </div>
                             </td>
-                            <td>{p.categories?.name || "—"}</td>
+                            <td>{p.category || "—"}</td>
                             <td>₹{p.price}</td>
-                            <td>{p.stock_quantity} {p.unit}</td>
+                            <td>{p.stock}</td>
                             <td>
                               <Toggle
                                 checked={!!p.is_active}

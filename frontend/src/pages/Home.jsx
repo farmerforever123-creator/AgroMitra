@@ -1,35 +1,38 @@
 import { useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { useLanguage } from '../context/LanguageContext'
 import Hero from '../components/Hero'
 import Features from '../components/Features'
 import Reviews from '../components/Reviews'
 import '../components/landing.css'
 
 function FeatureRow() {
+  const { t } = useLanguage()
   return (
     <div className="mini-feature-row reveal-up">
       <div className="mini-feature-item">
         <span className="mini-feature-icon">🔒</span>
-        Secure Transactions
+        {t('home.secureTransactions')}
       </div>
       <div className="mini-feature-item">
         <span className="mini-feature-icon">📈</span>
-        Best Market Prices
+        {t('home.bestMarketPrices')}
       </div>
       <div className="mini-feature-item">
         <span className="mini-feature-icon">🎧</span>
-        24/7 Expert Support
+        {t('home.expertSupport')}
       </div>
     </div>
   )
 }
 
 function StatsSection() {
+  const { t } = useLanguage()
   const stats = [
-    { value: '50K+', label: 'Happy Farmers' },
-    { value: '10K+', label: 'Products Listed' },
-    { value: '500+', label: 'Verified Buyers' },
-    { value: '25%', label: 'Avg. Income Growth' },
+    { value: '50K+', label: t('home.happyFarmers') },
+    { value: '10K+', label: t('home.productsListed') },
+    { value: '500+', label: t('home.verifiedBuyers') },
+    { value: '25%', label: t('home.avgIncomeGrowth') },
   ]
 
   return (
@@ -45,17 +48,18 @@ function StatsSection() {
 }
 
 function CTABanner() {
+  const { t } = useLanguage()
   return (
     <section className="cta-banner-wrapper reveal-up">
       <div className="cta-banner-inner">
-        <h2>Take Your Farming Business to the Next Level</h2>
-        <p>Join thousands of farmers already selling smarter with AgroMitra.</p>
+        <h2>{t('home.ctaTitle')}</h2>
+        <p>{t('home.ctaSubtitle')}</p>
         <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
           <Link to="/register" className="btn" style={{ background: 'white', color: '#15803d', fontWeight: 'bold' }}>
-            Get Started Now
+            {t('home.getStartedBtn')}
           </Link>
           <Link to="/products" className="btn" style={{ border: '1px solid white', color: 'white' }}>
-            Explore Marketplace
+            {t('home.exploreBtn')}
           </Link>
         </div>
       </div>

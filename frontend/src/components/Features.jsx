@@ -1,32 +1,32 @@
+import { useLanguage } from '../context/LanguageContext'
 import './landing.css'
 
-const features = [
-  {
-    icon: '🛒',
-    title: 'Buy Quality Produce',
-    description:
-      'Access a wide range of fresh, verified agricultural products directly from trusted farmers at the best market rates.',
-  },
-  {
-    icon: '🤝',
-    title: 'Sell with Confidence',
-    description:
-      'List your farm inventory easily, reach thousands of buyers instantly, and secure faster payments without middlemen.',
-  },
-  {
-    icon: '📊',
-    title: 'Smart Analytics',
-    description:
-      'Track your sales, analyze market trends, and make data-driven decisions to grow your agricultural business.',
-  },
-]
-
 export default function Features() {
+  const { t } = useLanguage()
+  
+  const features = [
+    {
+      icon: '🛒',
+      title: t('features.f1Title'),
+      description: t('features.f1Desc'),
+    },
+    {
+      icon: '🤝',
+      title: t('features.f2Title'),
+      description: t('features.f2Desc'),
+    },
+    {
+      icon: '📊',
+      title: t('features.f3Title'),
+      description: t('features.f3Desc'),
+    },
+  ]
+
   return (
     <section className="why-choose-section">
       <div className="section-head reveal-up">
-        <span className="section-badge" style={{ background: '#dcfce7', color: '#16a34a', padding: '8px 16px', borderRadius: '20px', fontWeight: 'bold' }}>Why Choose AgroMitra?</span>
-        <h2 style={{ fontSize: '40px', marginTop: '16px' }}>Everything needed for better farming</h2>
+        <span className="section-badge" style={{ background: '#dcfce7', color: '#16a34a', padding: '8px 16px', borderRadius: '20px', fontWeight: 'bold' }}>{t('features.title')}</span>
+        <h2 style={{ fontSize: '40px', marginTop: '16px' }}>{t('features.title')}</h2>
       </div>
 
       <div className="why-choose-grid">

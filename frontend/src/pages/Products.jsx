@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useLanguage } from '../context/LanguageContext'
 import ProductCard from '../components/ProductCard'
 import '../components/landing.css'
 
@@ -13,6 +14,7 @@ const CATEGORIES = [
 
 export default function Products() {
   const navigate = useNavigate()
+  const { t } = useLanguage()
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -32,15 +34,12 @@ export default function Products() {
     setLoading(true)
     setError(null)
 
-    const { data, err } = await supabase
+    const { data, error: err } = await supabase
       .from('products')
-      .select(`
-        *,
-        categories(name),
-        product_images(image_url, is_primary)
-      `)
-      .eq('is_active', true)
-      .eq('is_approved', true)
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    console.log("FETCHED PRODUCTS:", data)
 
     if (err) {
       console.error(err)
@@ -61,7 +60,7 @@ export default function Products() {
       data = data.filter(
         (p) =>
           p.name?.toLowerCase().includes(q) ||
-          p.categories?.name?.toLowerCase().includes(q)
+          p.category?.toLowerCase().includes(q)
       )
     }
 
@@ -82,7 +81,7 @@ export default function Products() {
         <div className="products-container-pro">
            <div className="products-loading">
              <div className="loader-spinner"></div>
-             <p>Loading fresh products...</p>
+             <p>{t('productsPage.title')} Loading...</p>
            </div>
         </div>
       </section>
@@ -95,14 +94,14 @@ export default function Products() {
         <div className="products-hero-mini">
           <div>
             <span>AgroMitra Marketplace</span>
-            <h1>Fresh Products for Smart Farming</h1>
+            <h1>{t('productsPage.title')}</h1>
             <p>Explore seeds, fertilizers, tools, vegetables and more.</p>
           </div>
 
           <div className="products-controls-pro">
             <input
               type="text"
-              placeholder="Search products..."
+              placeholder={t('productsPage.searchPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -131,7 +130,7 @@ export default function Products() {
             {/* All Products Section */}
             <div className="category-product-section">
               <div className="category-section-head">
-                <h2>All Products</h2>
+                <h2>{t('productsPage.title')}</h2>
                 <span>{filteredProducts.length} Items</span>
               </div>
               

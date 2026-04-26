@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import axios from 'axios'
+import { useLanguage } from '../context/LanguageContext'
 import '../components/landing.css'
 
 // Merchant Configuration
@@ -16,6 +17,7 @@ const isMobileDevice = () => {
 export default function PaymentSuccess() {
   const { state } = useLocation()
   const navigate = useNavigate()
+  const { t } = useLanguage()
   
   const [visible, setVisible] = useState(false)
   const [showPayNow, setShowPayNow] = useState(false)
@@ -144,7 +146,7 @@ export default function PaymentSuccess() {
           </div>
         </div>
 
-        <h1 className="paysuccess-heading">Order Placed!</h1>
+        <h1 className="paysuccess-heading">{t('paymentPage.success') || 'Order Placed!'}</h1>
         <p className="paysuccess-sub">Your order has been placed. Payment is pending.</p>
 
         {/* Info Card */}

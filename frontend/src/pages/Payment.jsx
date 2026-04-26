@@ -11,6 +11,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../lib/supabase'
 import axios from 'axios'
+import { useLanguage } from '../context/LanguageContext'
 import '../components/landing.css'
 
 // Fixed merchant UPI ID — stored in env for easy config
@@ -36,6 +37,7 @@ function isMobile() {
 
 export default function Payment() {
   const navigate = useNavigate()
+  const { t } = useLanguage()
 
   const [orderData, setOrderData]       = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('upi')
@@ -193,8 +195,8 @@ export default function Payment() {
     <section className="payment-page">
       <div className="payment-container">
         <div className="payment-header">
-          <span>Payment</span>
-          <h1>Complete Payment</h1>
+          <span>{t('paymentPage.title')}</span>
+          <h1>{t('paymentPage.title')}</h1>
           <p>Choose your payment method and confirm your order.</p>
         </div>
 
@@ -233,7 +235,7 @@ export default function Payment() {
             {/* ─── UPI Flow ─── */}
             {paymentMethod === 'upi' && (
               <div className="payment-card">
-                <h2 className="payment-card-title">📱 Pay via UPI</h2>
+                <h2 className="payment-card-title">📱 {t('paymentPage.payViaUpi')}</h2>
 
                 {/* Amount highlight */}
                 <div className="upi-amount-box">
@@ -313,7 +315,7 @@ export default function Payment() {
                   onClick={() => createOrder('pending')}
                   disabled={processing}
                 >
-                  {processing ? 'Placing Order...' : '✅ I Have Paid – Place Order'}
+                  {processing ? 'Placing Order...' : t('paymentPage.confirmPayment')}
                 </button>
               </div>
             )}

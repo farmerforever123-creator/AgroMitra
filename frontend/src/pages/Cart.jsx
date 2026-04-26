@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useLanguage } from '../context/LanguageContext'
 import '../components/landing.css'
 
 export default function Cart() {
   const navigate = useNavigate()
+  const { t } = useLanguage()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
@@ -105,7 +107,7 @@ export default function Cart() {
       <div className="cart-container">
         <div className="cart-header">
           <span>Shopping Cart</span>
-          <h1>Your Cart Items</h1>
+          <h1>{t('cartPage.title')}</h1>
           <p>Review your selected products before placing order.</p>
         </div>
 
@@ -113,7 +115,7 @@ export default function Cart() {
 
         {items.length === 0 ? (
           <div className="cart-empty">
-            <h2>Your cart is empty</h2>
+            <h2>{t('cartPage.empty')}</h2>
             <p>Add products from marketplace to see them here.</p>
             <Link to="/products">Explore Products</Link>
           </div>
@@ -163,7 +165,7 @@ export default function Cart() {
                       <h3>₹{subtotal}</h3>
 
                       <button onClick={() => removeItem(item.id)}>
-                        Remove
+                        {t('cartPage.remove')}
                       </button>
                     </div>
                   </div>
@@ -187,12 +189,12 @@ export default function Cart() {
               </div>
 
               <div className="summary-row total">
-                <span>Total Amount</span>
+                <span>{t('cartPage.total')}</span>
                 <strong>₹{totalAmount}</strong>
               </div>
 
               <button className="checkout-btn" onClick={() => navigate('/checkout')}>
-                Proceed to Checkout
+                {t('cartPage.checkoutBtn')}
               </button>
 
               <Link to="/products" className="continue-shopping">

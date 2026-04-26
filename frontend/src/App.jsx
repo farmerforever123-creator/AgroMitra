@@ -1,6 +1,10 @@
 import React from 'react'
+<<<<<<< HEAD
 import { Routes, Route } from 'react-router-dom'
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
+=======
+import { Routes, Route, useLocation } from 'react-router-dom'
+>>>>>>> f04a6ef (last updated code)
 import Navbar from './components/Navbar.jsx'
 import Footer from './components/Footer.jsx'
 import Home from './pages/Home.jsx'
@@ -34,6 +38,10 @@ const STANDALONE_ROUTES = ['/seller-dashboard'];
 function AppShell() {
   const location = useLocation();
   const isStandalone = STANDALONE_ROUTES.includes(location.pathname);
+
+  React.useEffect(() => {
+    console.log("ROUTE CHANGED TO:", location.pathname);
+  }, [location.pathname]);
 
   return (
     <>
@@ -138,6 +146,7 @@ function AppShell() {
   );
 }
 
+<<<<<<< HEAD
 export default App;
 function App() {
   return (
@@ -148,3 +157,6 @@ function App() {
 }
 
 export default App
+=======
+export default AppShell;
+>>>>>>> f04a6ef (last updated code)

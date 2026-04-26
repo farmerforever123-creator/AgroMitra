@@ -8,8 +8,10 @@ import {
   MessageSquareText,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useLanguage } from '../context/LanguageContext'
 
 export default function Contact() {
+  const { t } = useLanguage()
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -55,8 +57,8 @@ export default function Contact() {
     <section className="contact-page-pro">
       <div className="contact-container-pro">
         <div className="contact-header-pro text-center">
-          <span className="contact-badge">Contact Us</span>
-          <h1>Get in touch</h1>
+          <span className="contact-badge">{t('contact.title')}</span>
+          <h1>{t('contact.title')}</h1>
           <p>
             Have questions about our products, support, or agricultural
             services? Our team is here to help you quickly and professionally.
@@ -124,7 +126,7 @@ export default function Contact() {
             <form onSubmit={handleSubmit} className="contact-form-pro">
               <div className="form-row-2">
                 <div className="form-group">
-                  <label>Your name</label>
+                  <label>{t('contact.name')}</label>
                   <input
                     type="text"
                     name="name"
@@ -136,7 +138,7 @@ export default function Contact() {
                 </div>
 
                 <div className="form-group">
-                  <label>Email</label>
+                  <label>{t('contact.email')}</label>
                   <input
                     type="email"
                     name="email"
@@ -161,7 +163,7 @@ export default function Contact() {
               </div>
 
               <div className="form-group">
-                <label>Message</label>
+                <label>{t('contact.message')}</label>
                 <textarea
                   name="message"
                   value={formData.message}
@@ -176,7 +178,7 @@ export default function Contact() {
               {error && <div className="form-alert error">{error}</div>}
 
               <button type="submit" disabled={loading} className="submit-btn">
-                {loading ? 'Sending...' : 'Send Message'}
+                {loading ? 'Sending...' : t('contact.send')}
                 {!loading && <Send size={18} />}
               </button>
             </form>

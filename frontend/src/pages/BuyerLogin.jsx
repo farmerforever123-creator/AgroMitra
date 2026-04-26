@@ -2,10 +2,12 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { validateEmail, normalizeEmail } from '../utils/authUtils'
+import { useLanguage } from '../context/LanguageContext'
 import '../components/landing.css'
 
 export default function BuyerLogin() {
   const navigate = useNavigate()
+  const { t } = useLanguage()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -17,17 +19,17 @@ export default function BuyerLogin() {
   const isEmailValid = email ? validateEmail(email) : true;
 
   async function handleSubmit(event) {
-    event.preventDefault()
-    
-    // 1. Normalize and Validate Email
+    event.preventDefault();
+    if (loading) return; // Prevent duplicate requests
+
     const normalizedEmail = normalizeEmail(email);
     if (!validateEmail(normalizedEmail)) {
       setError('Please enter a valid and secure email address.');
       return;
     }
 
-    setLoading(true)
-    setError('')
+    setLoading(true);
+    setError('');
 
     try {
       // 2. Authenticate with Supabase
@@ -36,46 +38,41 @@ export default function BuyerLogin() {
         password,
       });
 
-      if (authError) throw authError;
-
-      const user = authData.user;
-
-      // 3. Fetch role from 'users' table as per requirement
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-
-      let userRole;
-      if (userError || !userData) {
-        // Fallback to 'profiles' if 'users' doesn't exist yet, but prioritize 'users'
-        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-        if (!profile) throw new Error('User role not found.');
-        userRole = profile.role;
-      } else {
-        userRole = userData.role;
+      // Proper error message for invalid credentials
+      if (authError) {
+        if (authError.message.includes("Invalid login credentials")) {
+          throw new Error("Invalid email or password");
+        }
+        throw authError;
       }
 
-      // 4. Role Enforcement
-      if (userRole !== 'buyer') {
-        await supabase.auth.signOut();
-        throw new Error('This account is registered as a seller. Please use the Seller Login page.');
-      }
+      // 3. Login ke baad authenticated user safely fetch karo
+      const { data: { user }, error: userFetchError } = await supabase.auth.getUser();
+      if (userFetchError || !user) throw new Error("Authentication failed. Please try again.");
 
-      // 5. Store role, user, and token in localStorage
+      // Check role and handle null user safely
+      let userRole = 'buyer'; // Default for this page
+
+      // Profiles table sync (upsert)
+      const { error: upsertError } = await supabase
+        .from('profiles')
+        .upsert({ 
+          id: user.id, 
+          role: userRole,
+          email: user.email,
+          updated_at: new Date().toISOString()
+        });
+      
+      if (upsertError) console.error("Profile sync error:", upsertError.message);
+
+      // Store role, user, and token in localStorage
       localStorage.setItem('role', userRole);
       localStorage.setItem('user', JSON.stringify(user));
-      localStorage.setItem('token', authData.session.access_token); // Store JWT for backend
+      if (authData.session) {
+        localStorage.setItem('token', authData.session.access_token);
+      }
 
-      // 6. Log the login (optional backend call)
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
-      await fetch(`${API_BASE_URL}/auth/login-log`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: user.id, email: user.email, role: userRole })
-      }).catch(console.error);
-
+      console.log("LOGIN SUCCESS. Navigating to: /");
       window.dispatchEvent(new Event('authChange'));
       navigate('/'); // Redirect to Buyer Home
     } catch (err) {
@@ -123,8 +120,8 @@ export default function BuyerLogin() {
           <div className="buyer-login-card">
             <div className="buyer-login-top">
               <div className="buyer-login-icon">🛒</div>
-              <span className="buyer-login-small-badge">Welcome Back</span>
-              <h2>Buyer Login</h2>
+              <span className="buyer-login-small-badge">{t('auth.welcome')}</span>
+              <h2>{t('auth.buyerLogin')}</h2>
               <p>Login to continue shopping and manage your AgroMitra cart.</p>
             </div>
 
@@ -132,7 +129,7 @@ export default function BuyerLogin() {
 
             <form onSubmit={handleSubmit} className="buyer-login-form">
               <div className="buyer-form-group">
-                <label>Email Address</label>
+                <label>{t('auth.email')}</label>
                 <input
                   type="email"
                   placeholder="buyer@example.com"
@@ -143,7 +140,7 @@ export default function BuyerLogin() {
               </div>
 
               <div className="buyer-form-group">
-                <label>Password</label>
+                <label>{t('auth.password')}</label>
                 <div className="password-field">
                   <input
                     type={showPassword ? 'text' : 'password'}
@@ -169,12 +166,19 @@ export default function BuyerLogin() {
                 </label>
 
                 <Link to="/register" className="buyer-login-link">
-                  Create account
+                  {t('auth.createAccount')}
                 </Link>
               </div>
 
               <button type="submit" className="buyer-login-btn" disabled={loading}>
-                {loading ? 'Logging in...' : 'Login as Buyer'}
+                {loading ? (
+                  <div className="btn-loader-wrapper">
+                    <div className="spinner mini"></div>
+                    <span>{t('auth.loggingIn') || 'Logging in...'}</span>
+                  </div>
+                ) : (
+                  t('auth.login')
+                )}
               </button>
             </form>
 

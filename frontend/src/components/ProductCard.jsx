@@ -1,16 +1,16 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useLanguage } from '../context/LanguageContext'
 import './landing.css'
 
 export default function ProductCard({ product }) {
   const [adding, setAdding] = useState(false)
   const navigate = useNavigate()
+  const { t } = useLanguage()
 
   const image =
-    product?.product_images?.find((img) => img.is_primary)?.image_url ||
-    product?.product_images?.[0]?.image_url ||
-    product?.image_url ||
+    product?.image ||
     'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=500&q=80'
 
   async function handleAddToCart(e) {
@@ -58,18 +58,21 @@ export default function ProductCard({ product }) {
   }
 
   return (
-    <div className="shop-card" onClick={() => navigate(`/product/${product.id}`)} style={{ cursor: 'pointer' }}>
+    <div className="shop-card" onClick={() => {
+      console.log("NAVIGATING TO:", `/product/${product.id}`);
+      navigate(`/product/${product.id}`);
+    }} style={{ cursor: 'pointer' }}>
       <div className="shop-img-box">
         <img src={image} alt={product?.name || 'Product'} />
 
         <button onClick={handleAddToCart} disabled={adding}>
-          {adding ? '...' : 'ADD'}
+          {adding ? '...' : t('productsPage.addToCart') || 'ADD'}
         </button>
       </div>
 
       <div className="shop-info">
         <div className="shop-price">
-          <span>₹{product?.price || 0}</span>
+          <span>₹{product?.price || 0} / {product?.unit || 'piece'}</span>
           <del>₹{Number(product?.price || 0) + 100}</del>
         </div>
 
@@ -78,11 +81,11 @@ export default function ProductCard({ product }) {
         <h3>{product?.name}</h3>
 
         <p className="shop-pack">
-          1 pack ({product?.stock_quantity || 0} {product?.unit || 'pack'})
+          1 pack ({product?.stock || 0} in stock)
         </p>
 
         <span className="shop-tag">
-          {product?.categories?.name || 'Agriculture'}
+          {product?.category || 'Agriculture'}
         </span>
 
         <p className="shop-rating">⭐ 4.8</p>
