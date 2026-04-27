@@ -1,10 +1,5 @@
 import React from 'react'
-<<<<<<< HEAD
-import { Routes, Route } from 'react-router-dom'
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
-=======
 import { Routes, Route, useLocation } from 'react-router-dom'
->>>>>>> f04a6ef (last updated code)
 import Navbar from './components/Navbar.jsx'
 import Footer from './components/Footer.jsx'
 import Home from './pages/Home.jsx'
@@ -14,7 +9,7 @@ import Contact from './pages/Contact.jsx'
 import Register from './pages/Register.jsx'
 import BuyerLogin from './pages/BuyerLogin.jsx'
 import SellerLogin from './pages/SellerLogin.jsx'
-import Chatbot from "./components/Chatbot";
+import Chatbot from "./components/chatbot.jsx";
 import Cart from './pages/Cart.jsx'
 import Checkout from './pages/Checkout.jsx'
 import CategoryProducts from './pages/CategoryProducts.jsx'
@@ -35,7 +30,7 @@ import ProtectedRoute from './components/ProtectedRoute.jsx'
 // Routes that have their own full-screen layout (no public navbar/footer)
 const STANDALONE_ROUTES = ['/seller-dashboard'];
 
-function AppShell() {
+function App() {
   const location = useLocation();
   const isStandalone = STANDALONE_ROUTES.includes(location.pathname);
 
@@ -45,25 +40,6 @@ function AppShell() {
 
   return (
     <>
-      <div className="app-shell">
-
-        <Navbar />
-
-        <main>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/products" element={<Products />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/buyer-login" element={<BuyerLogin />} />
-            <Route path="/seller-login" element={<SellerLogin />} />
-            <Route path="/cart" element={<Cart />} />
-          </Routes>
-        </main>
-
-        <Footer />
-
-      </div>
       {!isStandalone && <Navbar />}
 
       <main>
@@ -146,17 +122,5 @@ function AppShell() {
   );
 }
 
-<<<<<<< HEAD
 export default App;
-function App() {
-  return (
-    <Router>
-      <AppShell />
-    </Router>
-  );
-}
 
-export default App
-=======
-export default AppShell;
->>>>>>> f04a6ef (last updated code)

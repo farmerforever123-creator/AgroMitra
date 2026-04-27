@@ -229,7 +229,7 @@ export default function Chatbot() {
       {/* 💬 CHATBOX UI (Glassmorphism & WhatsApp Style) */}
       {open && (
         <div
-          key={i}
+
           style={{
             position: "fixed",
             bottom: 100,
@@ -287,39 +287,6 @@ export default function Chatbot() {
             </div>
           </div>
 
-<<<<<<< HEAD
-          {/* LANGUAGE SELECTOR (Floating below header) */}
-          <div style={{ display: "flex", justifyContent: "flex-end", padding: "0 20px" }}>
-            <select
-              onChange={(e) => setLang(e.target.value)}
-              value={lang}
-              style={{
-                marginTop: "-15px",
-                borderRadius: 8,
-                fontSize: 13,
-                fontWeight: 500,
-                padding: "6px 12px",
-                background: "rgba(255,255,255,0.7)",
-                border: "1px solid rgba(0,0,0,0.1)",
-                color: "#333",
-                outline: "none",
-                cursor: "pointer",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
-                backdropFilter: "blur(5px)",
-              }}
-            >
-              <option value="en">English / हिंदी ⌄</option>
-              <option value="en">English</option>
-              <option value="hi">हिंदी</option>
-            </select>
-          </div>
-        </div>
-      ))}
-=======
-
->>>>>>> f04a6ef (last updated code)
-
-          {/* CHAT AREA */}
           <div
             className="agromitra-chat-area"
             style={{

@@ -2,11 +2,12 @@ import dotenv from "dotenv";
 import axios from "axios";
 import app from "./app.js";
 import chatRoute from "./routes/chat.js";
-
+import cors from "cors";
+import express from "express";
 // 🔐 Load env
 dotenv.config();
 
-const app = express();
+//const app = express();
 
 // ✅ Middleware
 app.use(cors());
